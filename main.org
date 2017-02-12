@@ -1,0 +1,504 @@
+#+TITLE: org-babel-async
+Would like to be able to start a function evaluating and then continue
+editing the buffer while it executes (useful for long-running SQL
+queries against Redshift, for example)
+
+Here's a good start. Now we just need to get the results in the buffer.
+* Proof of Concept
+** Phase 1: Async execution, no return
+#+BEGIN_SRC emacs-lisp
+    (defun org-babel-execute-src-block-mine (&optional arg info params)
+      "Execute the current source code block.
+    Insert the results of execution into the buffer.  Source code
+    execution and the collection and formatting of results can be
+    controlled through a variety of header arguments.
+
+    With prefix argument ARG, force re-execution even if an existing
+    result cached in the buffer would otherwise have been returned.
+
+    Optionally supply a value for INFO in the form returned by
+    `org-babel-get-src-block-info'.
+
+    Optionally supply a value for PARAMS which will be merged with
+    the header arguments specified at the front of the source code
+    block."
+      (interactive)
+      (let* ((org-babel-current-src-block-location
+	      (or org-babel-current-src-block-location
+	          (nth 5 info)
+	          (org-babel-where-is-src-block-head)))
+	     (info (if info (copy-tree info) (org-babel-get-src-block-info))))
+        ;; Merge PARAMS with INFO before considering source block
+        ;; evaluation since both could disagree.
+        (cl-callf org-babel-merge-params (nth 2 info) params)
+        (when (org-babel-check-evaluate info)
+          (cl-callf org-babel-process-params (nth 2 info))
+          (let* ((params (nth 2 info))
+	         (cache (let ((c (cdr (assq :cache params))))
+		          (and (not arg) c (string= "yes" c))))
+	         (new-hash (and cache (org-babel-sha1-hash info)))
+	         (old-hash (and cache (org-babel-current-result-hash)))
+	         (current-cache (and new-hash (equal new-hash old-hash))))
+	    (cond
+	     (current-cache
+	      (save-excursion		;Return cached result.
+	        (goto-char (org-babel-where-is-src-block-result nil info))
+	        (forward-line)
+	        (skip-chars-forward " \t")
+	        (let ((result (org-babel-read-result)))
+	          (message (replace-regexp-in-string "%" "%%" (format "%S" result)))
+	          result)))
+	     ((org-babel-confirm-evaluate info)
+	      (let* ((lang (nth 0 info))
+		     (result-params (cdr (assq :result-params params)))
+		     ;; Expand noweb references in BODY and remove any
+		     ;; coderef.
+		     (body
+		      (let ((coderef (nth 6 info))
+			    (expand
+			     (if (org-babel-noweb-p params :eval)
+			         (org-babel-expand-noweb-references info)
+			       (nth 1 info))))
+		        (if (not coderef) expand
+		          (replace-regexp-in-string
+		           (org-src-coderef-regexp coderef) "" expand nil nil 1))))
+		     (dir (cdr (assq :dir params)))
+		     (default-directory
+		       (or (and dir (file-name-as-directory (expand-file-name dir)))
+		           default-directory))
+		     (cmd (intern (concat "org-babel-execute:" lang)))
+		     result)
+	        (unless (fboundp cmd)
+	          (error "No org-babel-execute function for %s!" lang))
+	        (message "executing %s code block%s..."
+		         (capitalize lang)
+		         (let ((name (nth 4 info)))
+		           (if name (format " (%s)" name) "")))
+	        (if (member "none" result-params)
+		    (progn (funcall cmd body params)
+		           (message "result silenced"))
+	          (progn
+                    (async-start
+                     `(lambda ()
+                        (setq exec-path (append exec-path '("~/.emacs.d/elpa")))
+                        (package-initialize)
+                        (org-babel-do-load-languages
+                         'org-babel-load-languages
+                         '((emacs-lisp . t)
+                           (shell . t)))
+                        (,cmd ,body ',params))
+                     (lambda (result)
+                       (message "Async done: %s" result)))
+                    (setq result
+                          (let ((r (funcall cmd body params)))
+                            (if (and (eq (cdr (assq :result-type params)) 'value)
+                                     (or (member "vector" result-params)
+                                         (member "table" result-params))
+                                     (not (listp r)))
+                                (list (list r))
+                              r))))
+	          (let ((file (cdr (assq :file params))))
+		    ;; If non-empty result and :file then write to :file.
+		    (when file
+		      (when result
+		        (with-temp-file file
+		          (insert (org-babel-format-result
+			           result (cdr (assq :sep params))))))
+		      (setq result file))
+		    ;; Possibly perform post process provided its
+		    ;; appropriate.  Dynamically bind "*this*" to the
+		    ;; actual results of the block.
+		    (let ((post (cdr (assq :post params))))
+		      (when post
+		        (let ((*this* (if (not file) result
+				        (org-babel-result-to-file
+				         file
+				         (let ((desc (assq :file-desc params)))
+				           (and desc (or (cdr desc) result)))))))
+		          (setq result (org-babel-ref-resolve post))
+		          (when file
+			    (setq result-params (remove "file" result-params))))))
+		    (org-babel-insert-result-mine
+		     result result-params info new-hash lang)))
+	        (run-hooks 'org-babel-after-execute-hook)
+	        result)))))))
+#+END_SRC
+
+#+RESULTS:
+: org-babel-execute-src-block-mine
+
+** Phase 2: Async execution, with return
+
+Don't know why but for some reason org-babel-insert-result is throwing
+this:
+
+#+BEGIN_EXAMPLE
+if: Wrong type argument: integer-or-marker-p, nil
+#+END_EXAMPLE
+
+#+BEGIN_SRC emacs-lisp
+  (defun org-babel-execute-src-block-mine (&optional arg info params)
+    "Execute the current source code block.
+  Insert the results of execution into the buffer.  Source code
+  execution and the collection and formatting of results can be
+  controlled through a variety of header arguments.
+
+  With prefix argument ARG, force re-execution even if an existing
+  result cached in the buffer would otherwise have been returned.
+
+  Optionally supply a value for INFO in the form returned by
+  `org-babel-get-src-block-info'.
+
+  Optionally supply a value for PARAMS which will be merged with
+  the header arguments specified at the front of the source code
+  block."
+    (interactive)
+    (let* ((org-babel-current-src-block-location
+	    (or org-babel-current-src-block-location
+	        (nth 5 info)
+	        (org-babel-where-is-src-block-head)))
+	   (info (if info (copy-tree info) (org-babel-get-src-block-info))))
+      ;; Merge PARAMS with INFO before considering source block
+      ;; evaluation since both could disagree.
+      (cl-callf org-babel-merge-params (nth 2 info) params)
+      (when (org-babel-check-evaluate info)
+        (cl-callf org-babel-process-params (nth 2 info))
+        (let* ((params (nth 2 info))
+	       (cache (let ((c (cdr (assq :cache params))))
+		        (and (not arg) c (string= "yes" c))))
+	       (new-hash (and cache (org-babel-sha1-hash info)))
+	       (old-hash (and cache (org-babel-current-result-hash)))
+	       (current-cache (and new-hash (equal new-hash old-hash))))
+	  (cond
+	   (current-cache
+	    (save-excursion		;Return cached result.
+	      (goto-char (org-babel-where-is-src-block-result nil info))
+	      (forward-line)
+	      (skip-chars-forward " \t")
+	      (let ((result (org-babel-read-result)))
+	        (message (replace-regexp-in-string "%" "%%" (format "%S" result)))
+	        result)))
+	   ((org-babel-confirm-evaluate info)
+	    (let* ((lang (nth 0 info))
+		   (result-params (cdr (assq :result-params params)))
+		   ;; Expand noweb references in BODY and remove any
+		   ;; coderef.
+		   (body
+		    (let ((coderef (nth 6 info))
+			  (expand
+			   (if (org-babel-noweb-p params :eval)
+			       (org-babel-expand-noweb-references info)
+			     (nth 1 info))))
+		      (if (not coderef) expand
+		        (replace-regexp-in-string
+		         (org-src-coderef-regexp coderef) "" expand nil nil 1))))
+		   (dir (cdr (assq :dir params)))
+		   (default-directory
+		     (or (and dir (file-name-as-directory (expand-file-name dir)))
+		         default-directory))
+		   (cmd (intern (concat "org-babel-execute:" lang)))
+		   result)
+	      (unless (fboundp cmd)
+	        (error "No org-babel-execute function for %s!" lang))
+	      (message "executing %s code block%s..."
+		       (capitalize lang)
+		       (let ((name (nth 4 info)))
+		         (if name (format " (%s)" name) "")))
+	      (if (member "none" result-params)
+		  (progn (funcall cmd body params)
+		         (message "result silenced"))
+	        (progn
+                  (async-start
+                   `(lambda ()
+                      (setq exec-path (append exec-path '("~/.emacs.d/elpa")))
+                      (package-initialize)
+                      (org-babel-do-load-languages
+                       'org-babel-load-languages
+                       '((emacs-lisp . t)
+                         (shell . t)))
+                      (,cmd ,body ',params))
+                   `(lambda (result)
+                     (message "Async done: %s" result)
+                     (switch-to-buffer ,(current-buffer))
+                     (goto-char ,(point))
+                     (org-babel-insert-result result)
+                     (message "Insert done: %s" result)
+                     (run-hooks 'org-babel-after-execute-hook))))))))))))
+#+END_SRC
+#+RESULTS:
+: org-babel-execute-src-block-mine
+
+#+BEGIN_SRC sh
+sleep 7s && echo "hi"
+#+END_SRC
+
+#+RESULTS:
+: hi
+
+Woo-hoo! The problem ended up being that the callback was running in a
+buffer called <*emacs*> or some such name, so it wasn't able to find
+the #+RESULTS block.
+
+* Implementation
+:PROPERTIES:
+:header-args: :tangle org-babel-async.el
+:END:
+
+Ok, now that this works, let's think about the right way to do this.
+I'm thinking of dispatching based on the presence of an :async src
+block header. If that header is present, we'll replace or insert GUID
+placeholder in the results block and then kick off the asynchronous
+process. In the callback, we'll switch back to this buffer, goto point
+min, search forward for the captured GUID placeholder, and
+replace/insert the results.
+
+I'd really like to test this with ERT, as well.
+
+** Acceptance Tests
+
+*** Infrastructure
+
+#+BEGIN_SRC emacs-lisp
+    (defun placeholder-p (s)
+      "Returns non-nil if s is a placeholder for an asynchronous result."
+      (string-match-p "[a-z0-9]\\{32\\}" s))
+
+    (defun results-block-contents ()
+      "Return the contents of the *only* results block in the buffer."
+      (interactive)
+      (save-excursion
+        (progn
+          (goto-char 0)
+          (org-babel-next-src-block)
+          (goto-char (org-babel-where-is-src-block-result))
+          (org-babel-read-result))))
+
+  (defmacro with-buffer-contents (s &rest forms)
+    "Execute forms in a temporary buffer with contents s"
+      `(save-excursion
+         (with-temp-buffer
+           (progn
+             (goto-char 0)
+             (insert ,s)
+             (goto-char 0)
+             ,@forms))))
+
+    (defun wait-for-seconds (n)
+      "Sleep for n seconds. This is a workaround for a bug in
+    sleep-for. See
+    http://stackoverflow.com/questions/14698081/elisp-sleep-for-doesnt-block-when-running-a-test-in-ert"
+      (let ((deadline (+ n (float-time))))
+        (while (< (float-time) deadline)
+          (sleep-for 1))))
+#+END_SRC
+
+*** Test Case 1: Shell block, no prior RESULTS
+
+#+BEGIN_SRC emacs-lisp
+    (ert-deftest test-async-execute-fresh-sh-block ()
+          "Test that we can insert results for a sh block that hasn't been executed yet"
+          (let ((buffer-contents "Here's a shell source block:
+
+      ,,#+BEGIN_SRC sh :async
+          sleep 1s && echo 'Sorry for the wait.'
+      ,,#+END_SRC"))
+            (with-buffer-contents buffer-contents
+              (progn
+                (org-babel-next-src-block)
+                (org-ctrl-c-ctrl-c)
+                (should (placeholder-p (results-block-contents)))
+                (wait-for-seconds 5)
+                (should (string= "Sorry for the wait." (results-block-contents)))))))
+#+END_SRC
+
+*** Test Case 2: Shell block, with prior results
+#+BEGIN_SRC emacs-lisp
+  (ert-deftest test-async-execute-existing-sh-block ()
+        "Test that we can insert results for a sh block that has already been executed"
+        (let ((buffer-contents "Here's a shell source block:
+
+    ,,#+BEGIN_SRC sh :async
+        sleep 1s && echo 'Sorry for the wait.'
+    ,,#+END_SRC"))
+          (with-buffer-contents buffer-contents
+            (progn
+              (org-babel-next-src-block)
+              (org-ctrl-c-ctrl-c)
+              (should (placeholder-p (results-block-contents)))
+              (wait-for-seconds 5)
+              (should (string= "Sorry for the wait." (results-block-contents)))))))
+              ;(goto-char 0)
+              ;(message "Curso: %s" (what-cursor-position))
+              ;(org-babel-next-src-block)
+              ;(message "Curso: %s" (what-cursor-position))
+              ;(org-ctrl-c-ctrl-c)
+              ;(should (placeholder-p (results-block-contents)))
+              ;(wait-for-seconds 5)
+              ;(should (string= "Sorry for the wait." (results-block-contents)))))))
+#+END_SRC
+
+#+RESULTS:
+: test-async-execute-existing-sh-block
+
+
+** Attach to Ctrl-C Ctrl-C
+
+If the header contains ~:async~, we'll steal the command before it
+gets to ~org-babel-execute-src-block~.
+
+#+BEGIN_SRC emacs-lisp
+(add-to-list 'org-ctrl-c-ctrl-c-hook 'org-babel-execute-src-block:async)
+#+END_SRC
+
+#+RESULTS:
+| org-babel-execute-src-block:async |
+
+#+BEGIN_SRC emacs-lisp
+  (defun org-babel-execute-src-block:async (&optional arg info params)
+  "Like org-babel-execute-src-block, but run asynchronously."
+  (interactive "P")
+  (when (and (org-in-src-block-p)
+             (assoc :async (nth 2 (org-babel-get-src-block-info))))
+    (let ((placeholder (generate-uuid)))
+      (org-babel-insert-result placeholder)
+      ;; This is the original source of org-babel-execute-src-block
+      (let* ((org-babel-current-src-block-location
+	    (or org-babel-current-src-block-location
+	        (nth 5 info)
+	        (org-babel-where-is-src-block-head)))
+	   (info (if info (copy-tree info) (org-babel-get-src-block-info))))
+      ;; Merge PARAMS with INFO before considering source block
+      ;; evaluation since both could disagree.
+      (cl-callf org-babel-merge-params (nth 2 info) params)
+      (when (org-babel-check-evaluate info)
+        (cl-callf org-babel-process-params (nth 2 info))
+        (let* ((params (nth 2 info))
+	       (cache (let ((c (cdr (assq :cache params))))
+		        (and (not arg) c (string= "yes" c))))
+	       (new-hash (and cache (org-babel-sha1-hash info)))
+	       (old-hash (and cache (org-babel-current-result-hash)))
+	       (current-cache (and new-hash (equal new-hash old-hash))))
+	  (cond
+	   (current-cache
+	    (save-excursion		;Return cached result.
+	      (goto-char (org-babel-where-is-src-block-result nil info))
+	      (forward-line)
+	      (skip-chars-forward " \t")
+	      (let ((result (org-babel-read-result)))
+	        (message (replace-regexp-in-string "%" "%%" (format "%S" result)))
+	        result)))
+	   ((org-babel-confirm-evaluate info)
+	    (let* ((lang (nth 0 info))
+		   (result-params (cdr (assq :result-params params)))
+		   ;; Expand noweb references in BODY and remove any
+		   ;; coderef.
+		   (body
+		    (let ((coderef (nth 6 info))
+			  (expand
+			   (if (org-babel-noweb-p params :eval)
+			       (org-babel-expand-noweb-references info)
+			     (nth 1 info))))
+		      (if (not coderef) expand
+		        (replace-regexp-in-string
+		         (org-src-coderef-regexp coderef) "" expand nil nil 1))))
+		   (dir (cdr (assq :dir params)))
+		   (default-directory
+		     (or (and dir (file-name-as-directory (expand-file-name dir)))
+		         default-directory))
+		   (cmd (intern (concat "org-babel-execute:" lang)))
+		   result)
+	      (unless (fboundp cmd)
+	        (error "No org-babel-execute function for %s!" lang))
+	      (message "executing %s code block%s..."
+		       (capitalize lang)
+		       (let ((name (nth 4 info)))
+		         (if name (format " (%s)" name) "")))
+	        (progn
+                  (async-start
+                   `(lambda ()
+                      ;; TODO: Put this in a function so it can be overidden
+                      ;; Initialize the new Emacs process with org-babel functions
+                      (setq exec-path ',exec-path)
+                      (package-initialize)
+                      (org-babel-do-load-languages 'org-babel-load-languages ',org-babel-load-languages)
+                      (,cmd ,body ',params))
+                   (if (member "none" ',result-params)
+                       (progn (message "result silenced")
+                              'ignore)
+                     `(lambda (result)
+                        (switch-to-buffer ,(current-buffer))
+                        (point-to-register 13) ;; TODO: totally arbitrary choice of register
+                        (goto-char (point-min))
+                        (re-search-forward ,placeholder)
+                        (org-babel-previous-src-block)
+                        (let ((file (cdr (assq :file ',params))))
+                          ;; If non-empty result and :file then write to :file.
+                          (when file
+                            (when result
+                              (with-temp-file file
+                                (insert (org-babel-format-result
+                                         result (cdr (assq :sep ',params))))))
+                            (setq result file))
+                          ;; Possibly perform post process provided its
+                          ;; appropriate.  Dynamically bind "*this*" to the
+                          ;; actual results of the block.
+                          (let ((post (cdr (assq :post ',params))))
+                            (when post
+                              (let ((*this* (if (not file) result
+                                              (org-babel-result-to-file
+                                               file
+                                               (let ((desc (assq :file-desc ',params)))
+                                                 (and desc (or (cdr desc) result)))))))
+                                (setq result (org-babel-ref-resolve post))
+                                (when file
+                                  (setq result-params (remove "file" ',result-params))))))
+                          (org-babel-insert-result result ',result-params ',info ',new-hash ',lang)
+                          (run-hooks 'org-babel-after-execute-hook))
+                          (goto-char (point-min))
+                          ;(re-search-forward "__RETURN_HERE__")
+                          ;(delete-backward-char (length "__RETURN_HERE__"))
+                          (jump-to-register 13))))))))))))))
+#+END_SRC
+
+#+RESULTS:
+: org-babel-execute-src-block:async
+
+#+BEGIN_SRC emacs-lisp
+  (defun generate-uuid ()
+    "Generate a 32 character UUID"
+    (md5 (number-to-string (random 100000000))))
+#+END_SRC
+
+#+RESULTS:
+: generate-uuid
+
+** Test Harness
+
+#+BEGIN_SRC emacs-lisp :shebang #!/bin/bash :tangle run-tests.el
+  (defun load-org-mode ()
+    (add-to-list 'load-path "./org-mode/lisp")
+    ;; Note: Org uses lower version when org-mode/contrib/lisp is on the load path
+    (org-babel-do-load-languages 'org-babel-load-languages '((emacs-lisp . t) (shell . t)))
+    (setq org-confirm-babel-evaluate nil)
+    (message "Running tests against org-version: %s" (org-version)))
+
+  (defun load-async ()
+    (setq package-archives '(("melpa" . "https://melpa.org/packages/")))
+    (setq package-user-dir "/home/astahlman/workplace/org-babel-async/elpa")
+    (require 'package)
+    (package-initialize)
+    (package-refresh-contents)
+    (package-install 'async)
+    (require 'async)
+    (message "Running tests against async-version: %s" (package-desc-version (cadr (assq 'async package-alist)))))
+
+  (load-org-mode)
+  (load-async)
+  (load "/home/astahlman/workplace/org-babel-async/org-babel-async.el")
+  (ert-run-tests-batch-and-exit)
+#+END_SRC
+
+#+BEGIN_SRC sh :shebang #!/bin/bash :tangle run-tests :prologue :epilogue
+emacs --script "./run-tests.el" -Q
+#+END_SRC
+
