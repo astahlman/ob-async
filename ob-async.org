@@ -679,7 +679,7 @@ reproducible way to set up the test environment.
 For the time being, we pull the latest version of async from melpa and
 use master:HEAD from the official org-mode git repository.
 
-#+BEGIN_SRC emacs-lisp :shebang #!/bin/bash :tangle run-tests.el
+#+BEGIN_SRC emacs-lisp :tangle run-tests.el
   (defun load-org-mode ()
     (add-to-list 'load-path "./org-mode/lisp")
     (add-to-list 'load-path ".")

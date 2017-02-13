@@ -1,2 +1,0 @@
-#!/bin/bash
-emacs --script "./run-tests.el" -Q
