@@ -1,11 +1,28 @@
 #+TITLE: org-babel-async
-Would like to be able to start a function evaluating and then continue
+#+AUTHOR: Andrew Stahlman
+
+I'd like to be able to start a function evaluating and then continue
 editing the buffer while it executes (useful for long-running SQL
 queries against Redshift, for example)
 
-Here's a good start. Now we just need to get the results in the buffer.
+* Wishlist
+- [ ] Add README
+- [ ] Additional testing: named src blocks, concurrent execution,
+  post-processing, etc.
+- [ ] Add package metadata, e.g. author, version, installation
+  instructions, etc.
+- [ ] Separate make targets for environment setup and running unit
+  tests, so that subsequent unit test runs don't require network
+  access
 * Proof of Concept
 ** Phase 1: Async execution, no return
+
+Here's a good start, proving that we can execute source blocks
+asynchronously. I just took the existing =org-babel-execute-src-block=
+definition and replaced the actual function call with an asynchronous
+implementation. From here we just need to capture the results and
+insert them into the buffer.
+
 #+BEGIN_SRC emacs-lisp
     (defun org-babel-execute-src-block-mine (&optional arg info params)
       "Execute the current source code block.
@@ -129,12 +146,20 @@ Here's a good start. Now we just need to get the results in the buffer.
 
 ** Phase 2: Async execution, with return
 
-Don't know why but for some reason org-babel-insert-result is throwing
-this:
+Spent a while tracking down why org-babel-insert-result was throwing
+this error:
 
 #+BEGIN_EXAMPLE
 if: Wrong type argument: integer-or-marker-p, nil
 #+END_EXAMPLE
+
+Note to self: src_emacs-lisp{(setq async-debug t)} {{{results(=t=)}}} is your friend for
+debugging errors like this. You can yank the exact string that's
+getting passed to the child process out of the ~*Messages*~ buffer and
+debug it in an ~emacs -Q~ session.
+
+Using this method I eventually worked out the right combination of
+escapes and captures in the async macros. And it actually works!
 
 #+BEGIN_SRC emacs-lisp
   (defun org-babel-execute-src-block-mine (&optional arg info params)
@@ -241,37 +266,46 @@ the #+RESULTS block.
 
 * Implementation
 :PROPERTIES:
-:header-args: :tangle org-babel-async.el
+:header-args: :tangle ob-async.el
 :END:
 
 Ok, now that this works, let's think about the right way to do this.
 I'm thinking of dispatching based on the presence of an :async src
-block header. If that header is present, we'll replace or insert GUID
-placeholder in the results block and then kick off the asynchronous
-process. In the callback, we'll switch back to this buffer, goto point
-min, search forward for the captured GUID placeholder, and
-replace/insert the results.
+block header. If that header is present, we'll replace or insert a
+GUID placeholder in the results block and then kick off the
+asynchronous process. In the callback, we'll switch back to this
+buffer, goto point min, search forward for the captured GUID
+placeholder, and replace/insert the results.
 
-I'd really like to test this with ERT, as well.
+I'd like to test this with ERT.
+
+#+BEGIN_SRC emacs-lisp
+(provide 'ob-async)
+#+END_SRC
+
+#+RESULTS:
+: ob-async
 
 ** Acceptance Tests
 
-*** Infrastructure
+*** Test Infrastructure
 
 #+BEGIN_SRC emacs-lisp
-    (defun placeholder-p (s)
-      "Returns non-nil if s is a placeholder for an asynchronous result."
-      (string-match-p "[a-z0-9]\\{32\\}" s))
+  (defun placeholder-p (s)
+    "Returns non-nil if s is a placeholder for an asynchronous result."
+    (and (= 32 (length s)) (string-match-p "^[a-z0-9]\\{32\\}$" s)))
 
-    (defun results-block-contents ()
-      "Return the contents of the *only* results block in the buffer."
-      (interactive)
-      (save-excursion
-        (progn
-          (goto-char 0)
-          (org-babel-next-src-block)
-          (goto-char (org-babel-where-is-src-block-result))
-          (org-babel-read-result))))
+  (defun results-block-contents ()
+    "Return the contents of the *only* results block in the buffer."
+    (interactive)
+    (save-excursion
+      (progn
+        (goto-char 0)
+        (org-babel-next-src-block)
+        (goto-char (org-babel-where-is-src-block-result))
+        (let ((result (org-babel-read-result)))
+          (message "RESULTS: %s" result)
+          result))))
 
   (defmacro with-buffer-contents (s &rest forms)
     "Execute forms in a temporary buffer with contents s"
@@ -283,75 +317,227 @@ I'd really like to test this with ERT, as well.
              (goto-char 0)
              ,@forms))))
 
-    (defun wait-for-seconds (n)
-      "Sleep for n seconds. This is a workaround for a bug in
-    sleep-for. See
-    http://stackoverflow.com/questions/14698081/elisp-sleep-for-doesnt-block-when-running-a-test-in-ert"
-      (let ((deadline (+ n (float-time))))
-        (while (< (float-time) deadline)
-          (sleep-for 1))))
+  (defun wait-for-seconds (n)
+    "Sleep for n seconds. This is a workaround for a bug in
+  sleep-for. See
+  http://stackoverflow.com/questions/14698081/elisp-sleep-for-doesnt-block-when-running-a-test-in-ert"
+    (let ((deadline (+ n (float-time))))
+      (while (< (float-time) deadline)
+        (sleep-for 1))))
 #+END_SRC
 
-*** Test Case 1: Shell block, no prior RESULTS
+#+RESULTS:
+: wait-for-seconds
+
+*** Shell block, no prior RESULTS
 
 #+BEGIN_SRC emacs-lisp
-    (ert-deftest test-async-execute-fresh-sh-block ()
-          "Test that we can insert results for a sh block that hasn't been executed yet"
-          (let ((buffer-contents "Here's a shell source block:
+  (ert-deftest test-async-execute-fresh-sh-block ()
+        "Test that we can insert results for a sh block that hasn't been executed yet"
+        (let ((buffer-contents "Here's a shell source block:
 
-      ,,#+BEGIN_SRC sh :async
-          sleep 1s && echo 'Sorry for the wait.'
-      ,,#+END_SRC"))
-            (with-buffer-contents buffer-contents
-              (progn
-                (org-babel-next-src-block)
-                (org-ctrl-c-ctrl-c)
-                (should (placeholder-p (results-block-contents)))
-                (wait-for-seconds 5)
-                (should (string= "Sorry for the wait." (results-block-contents)))))))
+    #+BEGIN_SRC sh :async
+        sleep 1s && echo 'Sorry for the wait.'
+    #+END_SRC"))
+          (with-buffer-contents buffer-contents
+            (org-babel-next-src-block)
+            (org-ctrl-c-ctrl-c)
+            (should (placeholder-p (results-block-contents)))
+            (wait-for-seconds 5)
+            (should (string= "Sorry for the wait." (results-block-contents))))))
 #+END_SRC
 
-*** Test Case 2: Shell block, with prior results
+#+RESULTS:
+: test-async-execute-fresh-sh-block
+
+*** Shell block, with prior results
 #+BEGIN_SRC emacs-lisp
   (ert-deftest test-async-execute-existing-sh-block ()
         "Test that we can insert results for a sh block that has already been executed"
         (let ((buffer-contents "Here's a shell source block:
 
-    ,,#+BEGIN_SRC sh :async
-        sleep 1s && echo 'Sorry for the wait.'
-    ,,#+END_SRC"))
+    #+BEGIN_SRC sh :async
+       sleep 1s && echo 'Sorry for the wait.'
+    #+END_SRC"))
           (with-buffer-contents buffer-contents
-            (progn
-              (org-babel-next-src-block)
-              (org-ctrl-c-ctrl-c)
-              (should (placeholder-p (results-block-contents)))
-              (wait-for-seconds 5)
-              (should (string= "Sorry for the wait." (results-block-contents)))))))
-              ;(goto-char 0)
-              ;(message "Curso: %s" (what-cursor-position))
-              ;(org-babel-next-src-block)
-              ;(message "Curso: %s" (what-cursor-position))
-              ;(org-ctrl-c-ctrl-c)
-              ;(should (placeholder-p (results-block-contents)))
-              ;(wait-for-seconds 5)
-              ;(should (string= "Sorry for the wait." (results-block-contents)))))))
+            (org-babel-next-src-block)
+            (org-ctrl-c-ctrl-c)
+            (should (placeholder-p (results-block-contents)))
+            (wait-for-seconds 5)
+            (should (string= "Sorry for the wait." (results-block-contents)))
+            (goto-char 0)
+            (org-babel-next-src-block)
+            (org-ctrl-c-ctrl-c)
+            (should (placeholder-p (results-block-contents)))
+            (wait-for-seconds 5)
+            (should (string= "Sorry for the wait." (results-block-contents))))))
 #+END_SRC
 
 #+RESULTS:
 : test-async-execute-existing-sh-block
 
-
-** Attach to Ctrl-C Ctrl-C
-
-If the header contains ~:async~, we'll steal the command before it
-gets to ~org-babel-execute-src-block~.
-
+*** Another language: Python block, no prior results
 #+BEGIN_SRC emacs-lisp
-(add-to-list 'org-ctrl-c-ctrl-c-hook 'org-babel-execute-src-block:async)
+  (ert-deftest test-async-execute-python-block ()
+        "Test that we can insert results for a sh block that hasn't been executed yet"
+        (let ((buffer-contents "Here's a Python source block:
+
+    #+BEGIN_SRC python :async
+        return 1 + 1
+    #+END_SRC"))
+          (with-buffer-contents buffer-contents
+            (org-babel-next-src-block)
+            (org-ctrl-c-ctrl-c)
+            (should (placeholder-p (results-block-contents)))
+            (wait-for-seconds 5)
+            (should (= 2 (results-block-contents))))))
 #+END_SRC
 
 #+RESULTS:
-| org-babel-execute-src-block:async |
+: test-async-execute-python-block
+
+*** Insert results while typing above the src block
+
+#+BEGIN_SRC emacs-lisp
+  (ert-deftest test-async-return-to-point-above-block ()
+        "Test that results are inserted in the correct location
+  when content has been added above the source block"
+        (let ((buffer-contents "Here's a Python source block:
+
+    #+BEGIN_SRC python :async
+        return 1 + 1
+    #+END_SRC"))
+          (with-buffer-contents buffer-contents
+            (org-babel-next-src-block)
+            (org-ctrl-c-ctrl-c)
+            (should (placeholder-p (results-block-contents)))
+            (re-search-backward "block:")
+            (end-of-line)
+            (newline-and-indent)
+            (insert "Here's some more stuff while we're waiting")
+            (let ((captured-point (point)))
+              (wait-for-seconds 5)
+              (should (= 2 (results-block-contents)))
+              (should (= captured-point (point)))
+              (should (re-search-backward "some more stuff"))
+              (should (re-search-forward "BEGIN_SRC python"))))))
+#+END_SRC
+
+#+RESULTS:
+: test-async-return-to-point-above-block
+
+*** Insert results while typing below the src block
+
+#+BEGIN_SRC emacs-lisp
+  (ert-deftest test-async-return-to-point-below-block ()
+        "Test that results are inserted in the correct location
+  when content has been added below the source block"
+        (let ((buffer-contents "Here's a Python source block:
+
+    #+BEGIN_SRC python :async
+        return 1 + 1
+    #+END_SRC"))
+          (with-buffer-contents buffer-contents
+            (org-babel-next-src-block)
+            (org-ctrl-c-ctrl-c)
+            (should (placeholder-p (results-block-contents)))
+            (end-of-buffer)
+            (newline-and-indent)
+            (insert "Here's some more stuff while we're waiting")
+            (let* ((captured-point (point))
+                   (expected-point (- captured-point (- (length (generate-uuid))
+                                                        (length "2")))))
+              (wait-for-seconds 5)
+              (should (= 2 (results-block-contents)))
+              (should (= expected-point (point)))
+              (should (re-search-backward "some more stuff"))
+              (should (re-search-backward "END_SRC"))))))
+#+END_SRC
+
+#+RESULTS:
+: test-async-return-to-point-below-block
+
+*** File output
+
+#+BEGIN_SRC emacs-lisp
+  (ert-deftest test-async-execute-file-block ()
+        "Test that we can insert results when header-arg :file is present"
+        (let ((buffer-contents "Here's a sh source block:
+
+    #+BEGIN_SRC sh :async :file \"/tmp/foo\"
+    echo \"Don't wait on me\"
+    #+END_SRC"))
+          (with-buffer-contents buffer-contents
+            (org-babel-next-src-block)
+            (org-ctrl-c-ctrl-c)
+            (should (placeholder-p (results-block-contents)))
+            (wait-for-seconds 5)
+            (should (string= "/tmp/foo" (results-block-contents)))
+            (let ((foo-contents (progn (find-file "/tmp/foo") (buffer-substring-no-properties (point-min) (point-max)))))
+              (should (string= "Don't wait on me\n" foo-contents))))))
+#+END_SRC
+
+#+RESULTS:
+: test-async-execute-file-block
+
+*** Table output
+#+BEGIN_SRC emacs-lisp
+  (ert-deftest test-async-execute-table-output ()
+        "Test that we can insert table output"
+        (let ((buffer-contents "Here's a source block:
+
+  #+BEGIN_SRC python :results output table :async t
+  x = [['{},{}    '.format(i, j) for j in range(1, 3)] for i in range(1, 3)]
+  for row in x:
+      print '{}\\n'.format(x)
+  #+END_SRC"))
+          (with-buffer-contents buffer-contents
+            (org-babel-next-src-block)
+            (org-ctrl-c-ctrl-c)
+            (should (placeholder-p (results-block-contents)))
+            (message "Waiting")
+            (wait-for-seconds 8)
+            (should (equal '(("1,1" "1,2") ("2,1" "2,2")) (results-block-contents)))
+            (message "%s" (results-block-contents)))))
+#+END_SRC
+
+#+RESULTS:
+: test-async-execute-table-output
+
+*** TODO Concurrent execution of multiple blocks
+*** TODO Execute a named block
+*** TODO Execute a blocks with post-processing
+*** TODO Silent output
+
+How should we handle this? Maybe it would be best to put a placeholder
+in a results block, then delete it once the command completes.
+
+#+BEGIN_SRC emacs-lisp
+  (ert-deftest test-async-execute-silent-block ()
+        "Test that we can insert results for a sh block that hasn't been executed yet"
+        :expected-result :failed
+        (let ((buffer-contents "Here's a sh source block:
+
+    #+BEGIN_SRC sh :async :results silent
+    echo \"Don't wait on me\"
+    #+END_SRC"))
+          (with-buffer-contents buffer-contents
+            (org-babel-next-src-block)
+            (org-ctrl-c-ctrl-c)
+            (should (placeholder-p (results-block-contents)))
+            (wait-for-seconds 5)
+            (should (not (results-block-contents))))))
+#+END_SRC
+
+#+RESULTS:
+: test-async-execute-silent-block
+
+** Definition
+
+If the header contains ~:async~, we'll steal the command before it
+gets to ~org-babel-execute-src-block~. The guts of this function are
+ripped straight from the original source for
+~org-babel-execute-src-block~.
 
 #+BEGIN_SRC emacs-lisp
   (defun org-babel-execute-src-block:async (&optional arg info params)
@@ -360,7 +546,7 @@ gets to ~org-babel-execute-src-block~.
   (when (and (org-in-src-block-p)
              (assoc :async (nth 2 (org-babel-get-src-block-info))))
     (let ((placeholder (generate-uuid)))
-      (org-babel-insert-result placeholder)
+      (org-babel-insert-result placeholder '("replace"))
       ;; This is the original source of org-babel-execute-src-block
       (let* ((org-babel-current-src-block-location
 	    (or org-babel-current-src-block-location
@@ -455,13 +641,13 @@ gets to ~org-babel-execute-src-block~.
                           (org-babel-insert-result result ',result-params ',info ',new-hash ',lang)
                           (run-hooks 'org-babel-after-execute-hook))
                           (goto-char (point-min))
-                          ;(re-search-forward "__RETURN_HERE__")
-                          ;(delete-backward-char (length "__RETURN_HERE__"))
                           (jump-to-register 13))))))))))))))
 #+END_SRC
 
 #+RESULTS:
 : org-babel-execute-src-block:async
+
+Our UUID is just a random MD5 hash, which is 32 characters.
 
 #+BEGIN_SRC emacs-lisp
   (defun generate-uuid ()
@@ -472,19 +658,39 @@ gets to ~org-babel-execute-src-block~.
 #+RESULTS:
 : generate-uuid
 
+** Attach to Ctrl-C Ctrl-C
+
+We register our function with the ctrl-c ctrl-c hook. If the
+header-args *do not* contain ~:async~ then we return nil to indicate
+we aren't handling this block.
+
+#+BEGIN_SRC emacs-lisp
+;; To register this function with ctrl-c-ctrl-c, add this somewhere in your config file
+;; (add-to-list 'org-ctrl-c-ctrl-c-hook 'org-babel-execute-src-block:async)
+#+END_SRC
+
+#+RESULTS:
+
 ** Test Harness
+
+These tests are slow and brittle. I'm looking for a faster and more
+reproducible way to set up the test environment.
+
+For the time being, we pull the latest version of async from melpa and
+use master:HEAD from the official org-mode git repository.
 
 #+BEGIN_SRC emacs-lisp :shebang #!/bin/bash :tangle run-tests.el
   (defun load-org-mode ()
     (add-to-list 'load-path "./org-mode/lisp")
+    (add-to-list 'load-path ".")
     ;; Note: Org uses lower version when org-mode/contrib/lisp is on the load path
-    (org-babel-do-load-languages 'org-babel-load-languages '((emacs-lisp . t) (shell . t)))
+    (org-babel-do-load-languages 'org-babel-load-languages '((emacs-lisp . t) (shell . t) (python . t)))
     (setq org-confirm-babel-evaluate nil)
     (message "Running tests against org-version: %s" (org-version)))
 
   (defun load-async ()
     (setq package-archives '(("melpa" . "https://melpa.org/packages/")))
-    (setq package-user-dir "/home/astahlman/workplace/org-babel-async/elpa")
+    (setq package-user-dir "./elpa")
     (require 'package)
     (package-initialize)
     (package-refresh-contents)
@@ -494,7 +700,8 @@ gets to ~org-babel-execute-src-block~.
 
   (load-org-mode)
   (load-async)
-  (load "/home/astahlman/workplace/org-babel-async/org-babel-async.el")
+  (require 'ob-async)
+  (add-to-list 'org-ctrl-c-ctrl-c-hook 'org-babel-execute-src-block:async)
   (ert-run-tests-batch-and-exit)
 #+END_SRC
 
