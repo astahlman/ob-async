@@ -1,20 +1,26 @@
 #+TITLE: org-babel-async
 #+AUTHOR: Andrew Stahlman
 
-I'd like to be able to start a function evaluating and then continue
-editing the buffer while it executes (useful for long-running SQL
-queries against Redshift, for example)
-
 * Wishlist
-- [ ] Add README
+- [X] Add README
+- [X] Add package metadata, e.g. author, version, installation
+  instructions, etc.
 - [ ] Additional testing: named src blocks, concurrent execution,
   post-processing, etc.
-- [ ] Add package metadata, e.g. author, version, installation
-  instructions, etc.
 - [ ] Separate make targets for environment setup and running unit
   tests, so that subsequent unit test runs don't require network
   access
+- [ ] Proper make target to generate .el from .org source
+- [ ] Support #+CALL blocks
+- [ ] Write BDD style integration tests, like [[http://rejeep.github.io/emacs/testing/cask/ecukes/2013/10/20/integration-testing-in-emacs.html][this]]
 * Proof of Concept
+
+I love org-babel, but I hate that long-running functions (e.g.,
+querying Redshift) block Emacs until completion.
+
+I'd like to be able to start a function evaluating and then continue
+editing in the same buffer while it executes.
+
 ** Phase 1: Async execution, no return
 
 Here's a good start, proving that we can execute source blocks
@@ -264,6 +270,47 @@ Woo-hoo! The problem ended up being that the callback was running in a
 buffer called <*emacs*> or some such name, so it wasn't able to find
 the #+RESULTS block.
 
+* Header
+:PROPERTIES:
+:header-args: :tangle ob-async.el
+:END:
+
+
+#+BEGIN_SRC emacs-lisp
+  ;;; ob-async.el --- Asynchronous org-babel src block execution
+
+  ;; Copyright (C) 2017 Andrew Stahlman
+
+  ;; Author: Andrew Stahlman <andrewstahlman@gmail.com>
+  ;; Created: 10 Feb 2017
+  ;; Version: 0.1
+
+  ;; Keywords: tools, ob-async
+  ;; Homepage: https://github.com/astahlman/ob-async
+
+  ;; This file is not part of GNU Emacs.
+
+  ;; This program is free software: you can redistribute it and/or modify
+  ;; it under the terms of the GNU General Public License as published by
+  ;; the Free Software Foundation, either version 3 of the License, or
+  ;; (at your option) any later version.
+
+  ;; This program is distributed in the hope that it will be useful,
+  ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  ;; GNU General Public License for more details.
+
+  ;; You should have received a copy of the GNU General Public License
+  ;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+  ;; Package-Requires: ((async "1.9") (org "9.0.1"))
+
+  ;; Commentary: This file enables asynchronous execution of org-babel
+  ;; src blocks through the org-babel-execute-src-block:async function
+
+  ;;; Code:
+#+END_SRC
+
 * Implementation
 :PROPERTIES:
 :header-args: :tangle ob-async.el
@@ -277,7 +324,7 @@ asynchronous process. In the callback, we'll switch back to this
 buffer, goto point min, search forward for the captured GUID
 placeholder, and replace/insert the results.
 
-I'd like to test this with ERT.
+I'd also like to test this with ERT.
 
 #+BEGIN_SRC emacs-lisp
 (provide 'ob-async)
@@ -531,6 +578,7 @@ in a results block, then delete it once the command completes.
 
 #+RESULTS:
 : test-async-execute-silent-block
+*** TODO Notification when execution fails
 
 ** Definition
 
@@ -540,6 +588,7 @@ ripped straight from the original source for
 ~org-babel-execute-src-block~.
 
 #+BEGIN_SRC emacs-lisp
+  ;;;###autoload
   (defun org-babel-execute-src-block:async (&optional arg info params)
   "Like org-babel-execute-src-block, but run asynchronously."
   (interactive "P")
@@ -658,19 +707,6 @@ Our UUID is just a random MD5 hash, which is 32 characters.
 #+RESULTS:
 : generate-uuid
 
-** Attach to Ctrl-C Ctrl-C
-
-We register our function with the ctrl-c ctrl-c hook. If the
-header-args *do not* contain ~:async~ then we return nil to indicate
-we aren't handling this block.
-
-#+BEGIN_SRC emacs-lisp
-;; To register this function with ctrl-c-ctrl-c, add this somewhere in your config file
-;; (add-to-list 'org-ctrl-c-ctrl-c-hook 'org-babel-execute-src-block:async)
-#+END_SRC
-
-#+RESULTS:
-
 ** Test Harness
 
 These tests are slow and brittle. I'm looking for a faster and more
@@ -681,8 +717,8 @@ use master:HEAD from the official org-mode git repository.
 
 #+BEGIN_SRC emacs-lisp :tangle run-tests.el
   (defun load-org-mode ()
-    (add-to-list 'load-path "./org-mode/lisp")
-    (add-to-list 'load-path ".")
+    (add-to-list 'load-path (expand-file-name "./org-mode/lisp"))
+    (add-to-list 'load-path (expand-file-name "."))
     ;; Note: Org uses lower version when org-mode/contrib/lisp is on the load path
     (org-babel-do-load-languages 'org-babel-load-languages '((emacs-lisp . t) (shell . t) (python . t)))
     (setq org-confirm-babel-evaluate nil)
@@ -690,7 +726,7 @@ use master:HEAD from the official org-mode git repository.
 
   (defun load-async ()
     (setq package-archives '(("melpa" . "https://melpa.org/packages/")))
-    (setq package-user-dir "./elpa")
+    (setq package-user-dir (expand-file-name "./elpa"))
     (require 'package)
     (package-initialize)
     (package-refresh-contents)
@@ -705,7 +741,20 @@ use master:HEAD from the official org-mode git repository.
   (ert-run-tests-batch-and-exit)
 #+END_SRC
 
+
 #+BEGIN_SRC sh :shebang #!/bin/bash :tangle run-tests :prologue :epilogue
-emacs --script "./run-tests.el" -Q
+set -e
+
+source ./configure-local-env.sh
+EMACS="${EMACS:-$(which emacs)}"
+"$EMACS" --script "./run-tests.el" -Q
 #+END_SRC
 
+* Footer
+:PROPERTIES:
+:header-args: :tangle ob-async.el
+:END:
+
+#+BEGIN_SRC emacs-lisp :tangle ob-async.el
+;;; ob-async.el ends here
+#+END_SRC

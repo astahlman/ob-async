@@ -1,6 +1,5 @@
 setup:
 	cd org-mode && git pull && make autoloads
-test:
+	mkdir -p elpa
+test: setup
 	./run-tests
-publish:
-	emacs --batch --file ob-async.org --eval "(org-babel-tangle)"
