@@ -3,7 +3,7 @@ like this:
 
     sleep 3s && echo 'Done!'
 
-[Demo of async sh execution](readme-demo.gif)
+![Demo of async sh execution](readme-demo.gif)
 
 `ob-async` isn't tied to src blocks in a specifc org-babel
 language. Simply add the keyword `:async` to the header-args of any
