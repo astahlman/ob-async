@@ -2,7 +2,6 @@
   (add-to-list 'load-path (expand-file-name "./org-mode/lisp"))
   (add-to-list 'load-path (expand-file-name "."))
   ;; Note: Org uses lower version when org-mode/contrib/lisp is on the load path
-  ;;(require 'ob-shell)
   (org-babel-do-load-languages 'org-babel-load-languages '((emacs-lisp . t) (shell . t) (python . t)))
   (setq org-confirm-babel-evaluate nil)
   (message "Running tests against org-version: %s" (org-version)))

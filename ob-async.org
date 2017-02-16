@@ -740,16 +740,6 @@ use master:HEAD from the official org-mode git repository.
   (add-to-list 'org-ctrl-c-ctrl-c-hook 'org-babel-execute-src-block:async)
   (ert-run-tests-batch-and-exit)
 #+END_SRC
-
-
-#+BEGIN_SRC sh :shebang #!/bin/bash :tangle run-tests :prologue :epilogue
-set -e
-
-source ./configure-local-env.sh
-EMACS="${EMACS:-$(which emacs)}"
-"$EMACS" --script "./run-tests.el" -Q
-#+END_SRC
-
 * Footer
 :PROPERTIES:
 :header-args: :tangle ob-async.el

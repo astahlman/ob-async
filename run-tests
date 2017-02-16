@@ -1,6 +1,0 @@
-#!/bin/bash
-set -e
-
-source ./configure-local-env.sh
-EMACS="${EMACS:-$(which emacs)}"
-"$EMACS" --script "./run-tests.el" -Q
