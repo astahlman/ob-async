@@ -784,10 +784,10 @@ We set up a few dependencies for Travis:
           curl -LO https://raw.githubusercontent.com/ohler/ert/c619b56c5bc6a866e33787489545b87d79973205/lisp/emacs-lisp/ert-x.el ;
       fi
     - emacs --version
-    - ## Install Cask
+    # Install Cask
     - wget 'https://raw.githubusercontent.com/flycheck/emacs-travis/master/emacs-travis.mk'
     - make -f emacs-travis.mk install_cask
-    - ## Use Cask to install dependencies
+    # Use Cask to install dependencies
     - make install-dev
 
   script:
