@@ -18,6 +18,6 @@
 
 (load-org-mode)
 (load-async)
-(require 'ob-async)
-(add-to-list 'org-ctrl-c-ctrl-c-hook 'org-babel-execute-src-block:async)
+(load "test-ob-async.el")
+(add-to-list 'org-ctrl-c-ctrl-c-hook 'ob-async-org-babel-execute-src-block)
 (ert-run-tests-batch-and-exit)

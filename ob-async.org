@@ -336,9 +336,15 @@ I'd also like to test this with ERT.
 : ob-async
 
 ** Acceptance Tests
+:PROPERTIES:
+:header-args: :tangle test-ob-async.el
+:END:
+
 *** Test Infrastructure
 
 #+BEGIN_SRC emacs-lisp
+  (require 'ob-async)
+
   (defun placeholder-p (s)
     "Return non-nil if S is a placeholder for an asynchronous result."
     (and (= 32 (length s)) (string-match-p "^[a-z0-9]\\{32\\}$" s)))
@@ -762,8 +768,8 @@ use master:HEAD from the official org-mode git repository.
 
   (load-org-mode)
   (load-async)
-  (require 'ob-async)
-  (add-to-list 'org-ctrl-c-ctrl-c-hook 'org-babel-execute-src-block:async)
+  (load "test-ob-async.el")
+  (add-to-list 'org-ctrl-c-ctrl-c-hook 'ob-async-org-babel-execute-src-block)
   (ert-run-tests-batch-and-exit)
 #+END_SRC
 
