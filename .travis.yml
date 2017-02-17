@@ -24,6 +24,7 @@ install:
     fi
   - emacs --version
   # Install Cask
+  - mkdir "$HOME"/bin # The next step needs this
   - wget 'https://raw.githubusercontent.com/flycheck/emacs-travis/master/emacs-travis.mk'
   - make -f emacs-travis.mk install_cask
   # Use Cask to install dependencies
