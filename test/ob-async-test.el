@@ -1,5 +1,3 @@
-;(require 'ob-async)
-
 (defun placeholder-p (s)
   "Return non-nil if S is a placeholder for an asynchronous result."
   (and (= 32 (length s)) (string-match-p "^[a-z0-9]\\{32\\}$" s)))
