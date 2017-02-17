@@ -749,14 +749,16 @@ Our UUID is just a random MD5 hash, which is 32 characters.
 #+END_SRC
 
 * CI
-Every commit is tested on TravisCI.
-
-** travis.yml
 :PROPERTIES:
 :header-args: :tangle .travis.yml
 :END:
 
-We set up a few dependencies for Travis:
+Every commit is tested on Travis CI. Rather than build Emacs from
+source every time, we use prebuilt binaries for Emacs 24.5+ from
+[[https://github.com/npostavs/emacs-travis/][npostavs' emacs-travis repository.]]
+
+We test against =org-plus-contrib= from the official org archive and
+we take =async= from elpa.
 
 #+BEGIN_SRC yaml :exports results
   language: generic
@@ -783,7 +785,7 @@ We set up a few dependencies for Travis:
       fi
     - emacs --version
     # Install Cask
-    - mkdir "$HOME"/bin # The next step needs this
+    - mkdir "$HOME"/bin # Cask is installed here
     - wget 'https://raw.githubusercontent.com/flycheck/emacs-travis/master/emacs-travis.mk'
     - make -f emacs-travis.mk install_cask
     # Use Cask to install dependencies

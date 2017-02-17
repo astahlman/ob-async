@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/astahlman/ob-async.svg?branch=master)](https://travis-ci.org/astahlman/ob-async)
+
 `ob-async` enables asynchronous execution of org-babel src blocks,
 like this:
 
@@ -20,12 +22,4 @@ org-babel src block and invoke `ob-async-org-babel-execute-src-block`.
 
 ## Development
 
-If the version of Emacs that's on your `PATH` isn't the version you
-normally use, `cp local.mk{.template,}` and `export EMACS` to your
-preferred binary.
-
-For example, my `local.mk` looks like this:
-
-	export EMACS := /Applications/Emacs.app/Contents/MacOS/Emacs
-
-Then run the unit tests with `make test`.
+[Cask](https://github.com/cask/cask) manages dependencies and runs tests. Once Cask is installed, you can `make test`.
