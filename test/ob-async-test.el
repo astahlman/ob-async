@@ -1,4 +1,4 @@
-(require 'ob-async)
+;(require 'ob-async)
 
 (defun placeholder-p (s)
   "Return non-nil if S is a placeholder for an asynchronous result."

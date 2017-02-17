@@ -340,13 +340,13 @@ I'd also like to test this with ERT.
 
 ** Acceptance Tests
 :PROPERTIES:
-:header-args: :tangle test-ob-async.el
+:header-args: :tangle test/ob-async-test.el
 :END:
 
 *** Test Infrastructure
 
 #+BEGIN_SRC emacs-lisp
-  (require 'ob-async)
+  ;(require 'ob-async)
 
   (defun placeholder-p (s)
     "Return non-nil if S is a placeholder for an asynchronous result."
@@ -741,36 +741,63 @@ Our UUID is just a random MD5 hash, which is 32 characters.
 
 ** Test Harness
 
-These tests are slow and brittle. I'm looking for a faster and more
-reproducible way to set up the test environment.
-
-For the time being, we pull the latest version of async from melpa and
-use master:HEAD from the official org-mode git repository.
-
-#+BEGIN_SRC emacs-lisp :tangle run-tests.el
-  (defun load-org-mode ()
-    (add-to-list 'load-path (expand-file-name "./org-mode/lisp"))
-    (add-to-list 'load-path (expand-file-name "."))
-    ;; Note: Org uses lower version when org-mode/contrib/lisp is on the load path
-    (org-babel-do-load-languages 'org-babel-load-languages '((emacs-lisp . t) (shell . t) (python . t)))
-    (setq org-confirm-babel-evaluate nil)
-    (message "Running tests against org-version: %s" (org-version)))
-
-  (defun load-async ()
-    (setq package-archives '(("melpa" . "https://melpa.org/packages/")))
-    (setq package-user-dir (expand-file-name "./elpa"))
-    (require 'package)
-    (package-initialize)
-    (package-refresh-contents)
-    (package-install 'async)
-    (require 'async)
-    (message "Running tests against async-version: %s" (package-desc-version (cadr (assq 'async package-alist)))))
-
-  (load-org-mode)
-  (load-async)
-  (load "test-ob-async.el")
+#+BEGIN_SRC emacs-lisp :tangle test/test-helper.el
+  (org-babel-do-load-languages 'org-babel-load-languages '((emacs-lisp . t) (shell . t) (python . t)))
+  (setq org-confirm-babel-evaluate nil)
+  (message "org-version: %s" (org-version))
   (add-to-list 'org-ctrl-c-ctrl-c-hook 'ob-async-org-babel-execute-src-block)
-  (ert-run-tests-batch-and-exit)
+#+END_SRC
+
+* CI
+Every commit is tested on TravisCI.
+
+** travis.yml
+:PROPERTIES:
+:header-args: :tangle .travis.yml
+:END:
+
+We set up a few dependencies for Travis:
+
+#+BEGIN_SRC yaml :exports results
+  language: generic
+  sudo: false
+  git:
+    submodules: false
+
+  env:
+    - EMACS_VERSION=23.4
+    - EMACS_VERSION=24.3
+    - EMACS_VERSION=24.5
+    - EMACS_VERSION=25-prerelease
+
+  install:
+    - curl -LO https://github.com/npostavs/emacs-travis/releases/download/bins/emacs-bin-${EMACS_VERSION}.tar.gz
+    - tar -xaf emacs-bin-${EMACS_VERSION}.tar.gz -C /
+    # Configure $PATH: Emacs installed to /tmp/emacs
+    - export PATH=/tmp/emacs/bin:${PATH}
+    - if ! emacs -Q --batch --eval "(require 'cl-lib)" ; then
+          curl -Lo cl-lib.el http://elpa.gnu.org/packages/cl-lib-0.5.el ;
+          export warnings="'(not cl-functions)" ;
+      fi
+    - if ! emacs -Q --batch --eval "(require 'ert)" ; then
+          curl -LO https://raw.githubusercontent.com/ohler/ert/c619b56c5bc6a866e33787489545b87d79973205/lisp/emacs-lisp/ert.el &&
+          curl -LO https://raw.githubusercontent.com/ohler/ert/c619b56c5bc6a866e33787489545b87d79973205/lisp/emacs-lisp/ert-x.el ;
+      fi
+    - emacs --version
+    - ## Install Cask
+    - wget 'https://raw.githubusercontent.com/flycheck/emacs-travis/master/emacs-travis.mk'
+    - make -f emacs-travis.mk install_cask
+    - ## Use Cask to install dependencies
+    - make install-dev
+
+  script:
+    - make test
+
+  notifications:
+    email:
+      # Default is change, but that includes a new branch's 1st success.
+      on_success: never
+      on_failure: always # The default.
 #+END_SRC
 
 * Footer
