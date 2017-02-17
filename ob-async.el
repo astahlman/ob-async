@@ -34,6 +34,9 @@
 
 (provide 'ob-async)
 
+(require 'org)
+(require 'async)
+
 ;;;###autoload
 (defalias 'org-babel-execute-src-block:async 'ob-async-org-babel-execute-src-block)
 
