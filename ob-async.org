@@ -765,8 +765,6 @@ We set up a few dependencies for Travis:
     submodules: false
 
   env:
-    - EMACS_VERSION=23.4
-    - EMACS_VERSION=24.3
     - EMACS_VERSION=24.5
     - EMACS_VERSION=25-prerelease
 
