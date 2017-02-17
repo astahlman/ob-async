@@ -308,7 +308,7 @@ the #+RESULTS block.
 
   ;;; Commentary:
   ;; This file enables asynchronous execution of org-babel
-  ;; src blocks through the org-babel-execute-src-block:async function
+  ;; src blocks through the ob-async-org-babel-execute-src-block function
 
   ;;; Code:
 #+END_SRC
@@ -727,9 +727,6 @@ ripped straight from the original source for
                             (goto-char (point-min))
                             (jump-to-register 13))))))))))))))
 #+END_SRC
-
-#+RESULTS:
-: org-babel-execute-src-block:async
 
 Our UUID is just a random MD5 hash, which is 32 characters.
 

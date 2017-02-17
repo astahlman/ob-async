@@ -28,7 +28,7 @@
 
 ;;; Commentary:
 ;; This file enables asynchronous execution of org-babel
-;; src blocks through the org-babel-execute-src-block:async function
+;; src blocks through the ob-async-org-babel-execute-src-block function
 
 ;;; Code:
 
