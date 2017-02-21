@@ -586,6 +586,7 @@ in a results block, then delete it once the command completes.
 #+RESULTS:
 : test-async-execute-silent-block
 *** TODO Notification when execution fails
+*** TODO #+CALL blocks
 
 ** Definition
 
