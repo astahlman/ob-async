@@ -27,3 +27,7 @@ which includes `:async` in its header-args.
 ## Development
 
 [Cask](https://github.com/cask/cask) manages dependencies and runs tests. Once Cask is installed, you can `make test`.
+
+## Troubleshooting
+
+First, go through the troubleshooting checklist, `troubleshooting.org`. It's an org-mode file in this repository that's designed to diagnose issues with ob-async. If that doesn't solve your problem, include a copy of the entire file (which will include your `#+RESULTS` blocks) in a Github issue.
