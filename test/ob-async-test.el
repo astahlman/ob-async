@@ -160,6 +160,20 @@ for row in x:
 			  (should (equal '(("1,1" "1,2") ("2,1" "2,2")) (results-block-contents)))
 			  (message "%s" (results-block-contents)))))
 
+(ert-deftest test-async-execute-tramp-block ()
+  "Test that we can execute a block via Tramp with a :dir header-arg"
+  (let ((buffer-contents (format "Here's a sh source block:
+
+  #+BEGIN_SRC sh :async :dir \"/sudo:%s@localhost:/\"
+     echo $SUDO_USER $PWD
+  #+END_SRC" user-login-name)))
+    (with-buffer-contents buffer-contents
+			  (org-babel-next-src-block)
+			  (org-ctrl-c-ctrl-c)
+			  (should (placeholder-p (results-block-contents)))
+			  (wait-for-seconds 5)
+			  (should (string= (format "%s /" user-login-name) (results-block-contents))))))
+
 (ert-deftest test-async-execute-silent-block ()
   "Test that we can insert results for a sh block that hasn't been executed yet"
   :expected-result :failed

@@ -1,5 +1,5 @@
 language: generic
-sudo: false
+sudo: required
 git:
   submodules: false
 
