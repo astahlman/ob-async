@@ -558,6 +558,27 @@ I'd also like to test this with ERT.
 #+RESULTS:
 : test-async-execute-table-output
 
+*** Tramp
+
+#+BEGIN_SRC emacs-lisp
+  (ert-deftest test-async-execute-tramp-block ()
+    "Test that we can execute a block via Tramp with a :dir header-arg"
+    (let ((buffer-contents (format "Here's a sh source block:
+
+    ,#+BEGIN_SRC sh :async :dir \"/sudo:%s@localhost:/\"
+       echo $SUDO_USER $PWD
+    ,#+END_SRC" user-login-name)))
+      (with-buffer-contents buffer-contents
+			    (org-babel-next-src-block)
+			    (org-ctrl-c-ctrl-c)
+			    (should (placeholder-p (results-block-contents)))
+			    (wait-for-seconds 5)
+			    (should (string= (format "%s /" user-login-name) (results-block-contents))))))
+#+END_SRC
+
+#+RESULTS:
+: test-async-execute-tramp-block
+
 *** TODO Concurrent execution of multiple blocks
 *** TODO Execute a named block
 *** TODO Execute a blocks with post-processing
@@ -690,7 +711,8 @@ ripped straight from the original source for
 			(setq exec-path ',exec-path)
 			(package-initialize)
 			(org-babel-do-load-languages 'org-babel-load-languages ',org-babel-load-languages)
-			(,cmd ,body ',params))
+			(let ((default-directory ,default-directory))
+			  (,cmd ,body ',params)))
                      (if (member "none" ',result-params)
 			 (progn (message "result silenced")
 				'ignore)
