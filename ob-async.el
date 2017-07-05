@@ -24,7 +24,7 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-;; Package-Requires: ((async "1.9") (org "9.0.1"))
+;; Package-Requires: ((async "1.9") (org "9.0.1") (emacs "24.4"))
 
 ;;; Commentary:
 ;; This file enables asynchronous execution of org-babel
@@ -41,7 +41,7 @@
 (defalias 'org-babel-execute-src-block:async 'ob-async-org-babel-execute-src-block)
 
 ;;;###autoload
-(defun ob-async-org-babel-execute-src-block (&optional arg info params)
+(defun ob-async-org-babel-execute-src-block (&optional orig-fun arg info params)
   "Like org-babel-execute-src-block, but run asynchronously.
 
 Original docstring for org-babel-execute-src-block:
@@ -61,8 +61,16 @@ Optionally supply a value for PARAMS which will be merged with
 the header arguments specified at the front of the source code
 block."
   (interactive "P")
-  (when (and (org-in-src-block-p)
-             (assoc :async (nth 2 (org-babel-get-src-block-info))))
+  (cond
+   ;; If this function is not called as advice, do nothing
+   ((not orig-fun)
+    (warn "ob-async-org-babel-execute-src-block is longer needed in org-ctrl-c-ctrl-c-hook")
+    nil)
+   ;; If there is no :async parameter, call the original function
+   ((not (assoc :async (nth 2 (or info (org-babel-get-src-block-info)))))
+    (funcall orig-fun arg info params))
+   ;; Otherwise, perform asynchronous execution
+   (t
     (let ((placeholder (ob-async--generate-uuid)))
       (org-babel-insert-result placeholder '("replace"))
       ;; This is the original source of org-babel-execute-src-block
@@ -135,7 +143,8 @@ block."
 			(point-to-register 13) ;; TODO: totally arbitrary choice of register
 			(goto-char (point-min))
 			(re-search-forward ,placeholder)
-			(org-babel-previous-src-block)
+			(org-backward-element)
+			(org-backward-element)
 			(let ((file (cdr (assq :file ',params))))
                           ;; If non-empty result and :file then write to :file.
                           (when file
@@ -160,10 +169,12 @@ block."
                           (org-babel-insert-result result ',result-params ',info ',new-hash ',lang)
                           (run-hooks 'org-babel-after-execute-hook))
                           (goto-char (point-min))
-                          (jump-to-register 13))))))))))))))
+                          (jump-to-register 13)))))))))))))))
 
 (defun ob-async--generate-uuid ()
   "Generate a 32 character UUID."
   (md5 (number-to-string (random 100000000))))
+
+(advice-add 'org-babel-execute-src-block :around 'ob-async-org-babel-execute-src-block)
 
 ;;; ob-async.el ends here

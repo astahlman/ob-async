@@ -304,7 +304,7 @@ the #+RESULTS block.
   ;; You should have received a copy of the GNU General Public License
   ;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-  ;; Package-Requires: ((async "1.9") (org "9.0.1"))
+  ;; Package-Requires: ((async "1.9") (org "9.0.1") (emacs "24.4"))
 
   ;;; Commentary:
   ;; This file enables asynchronous execution of org-babel
@@ -350,13 +350,16 @@ I'd also like to test this with ERT.
     "Return non-nil if S is a placeholder for an asynchronous result."
     (and (= 32 (length s)) (string-match-p "^[a-z0-9]\\{32\\}$" s)))
 
-  (defun results-block-contents ()
-    "Return the contents of the *only* results block in the buffer."
+  (defun results-block-contents (&optional position)
+    "Return the contents of the *only* results block in the buffer.
+  Assume the source block is at POSITION if non-nil."
     (interactive)
     (save-excursion
       (progn
-	(goto-char 0)
-	(org-babel-next-src-block)
+	(if position
+	    (goto-char position)
+	  (goto-char 0)
+	  (org-babel-next-src-block))
 	(goto-char (org-babel-where-is-src-block-result))
 	(let ((result (org-babel-read-result)))
           (message "RESULTS: %s" result)
@@ -579,8 +582,50 @@ I'd also like to test this with ERT.
 #+RESULTS:
 : test-async-execute-tramp-block
 
+*** org-ctrl-c-ctrl-c-hook
+
+#+BEGIN_SRC emacs-lisp
+  (ert-deftest test-async-ctrl-c-ctrl-c-hook ()
+    "Test that asynchronous execution works with org-ctrl-c-ctrl-c-hook."
+    (let ((buffer-contents "Here's a shell source block:
+
+    ,#+BEGIN_SRC sh :async
+	sleep 1s && echo 'Sorry for the wait.'
+    ,#+END_SRC")
+	  (org-ctrl-c-ctrl-c-hook '(ob-async-org-babel-execute-src-block)))
+      (with-buffer-contents buffer-contents
+			    (org-babel-next-src-block)
+			    (org-ctrl-c-ctrl-c)
+			    (should (placeholder-p (results-block-contents)))
+			    (wait-for-seconds 5)
+			    (should (string= "Sorry for the wait." (results-block-contents))))))
+#+END_SRC
+
+#+RESULTS:
+: test-async-ctrl-c-ctrl-c-hook
+
 *** TODO Concurrent execution of multiple blocks
-*** TODO Execute a named block
+*** Execute a named block
+
+#+BEGIN_SRC emacs-lisp
+  (ert-deftest test-async-execute-named-block ()
+    "Test that we can asynchronously execute a block when cursor is on the name."
+    (let ((buffer-contents "Here's a shell source block:
+    ,#+NAME: async-block
+    ,#+BEGIN_SRC sh :async
+       sleep 1s && echo 'Sorry for the wait.'
+    ,#+END_SRC"))
+      (with-buffer-contents buffer-contents
+			    (re-search-forward "#\\+NAME")
+			    (org-ctrl-c-ctrl-c)
+			    (should (placeholder-p (results-block-contents)))
+			    (wait-for-seconds 5)
+			    (should (string= "Sorry for the wait." (results-block-contents))))))
+#+END_SRC
+
+#+RESULTS:
+: test-async-execute-named-block
+
 *** TODO Execute a blocks with post-processing
 *** TODO Silent output
 
@@ -607,7 +652,28 @@ in a results block, then delete it once the command completes.
 #+RESULTS:
 : test-async-execute-silent-block
 *** TODO Notification when execution fails
-*** TODO #+CALL blocks
+*** #+CALL blocks
+
+#+BEGIN_SRC emacs-lisp
+  (ert-deftest test-async-execute-call ()
+    "Test that we can asynchronously execute a #+CALL element."
+    (let ((buffer-contents "Here's a shell source block:
+    ,#+NAME: async-block
+    ,#+BEGIN_SRC sh :async
+       sleep 1s && echo 'Sorry for the wait.'
+    ,#+END_SRC
+
+    ,#+CALL: async-block()"))
+      (with-buffer-contents buffer-contents
+			    (let ((position (re-search-forward "#\\+CALL")))
+			      (org-ctrl-c-ctrl-c)
+			      (should (placeholder-p (results-block-contents position)))
+			      (wait-for-seconds 5)
+			      (should (string= "Sorry for the wait." (results-block-contents position)))))))
+#+END_SRC
+
+#+RESULTS:
+: test-async-execute-call
 
 ** Definition
 
@@ -627,7 +693,7 @@ ripped straight from the original source for
 
 #+BEGIN_SRC emacs-lisp
   ;;;###autoload
-  (defun ob-async-org-babel-execute-src-block (&optional arg info params)
+  (defun ob-async-org-babel-execute-src-block (&optional orig-fun arg info params)
     "Like org-babel-execute-src-block, but run asynchronously.
 
   Original docstring for org-babel-execute-src-block:
@@ -647,8 +713,16 @@ ripped straight from the original source for
   the header arguments specified at the front of the source code
   block."
     (interactive "P")
-    (when (and (org-in-src-block-p)
-               (assoc :async (nth 2 (org-babel-get-src-block-info))))
+    (cond
+     ;; If this function is not called as advice, do nothing
+     ((not orig-fun)
+      (warn "ob-async-org-babel-execute-src-block is longer needed in org-ctrl-c-ctrl-c-hook")
+      nil)
+     ;; If there is no :async parameter, call the original function
+     ((not (assoc :async (nth 2 (or info (org-babel-get-src-block-info)))))
+      (funcall orig-fun arg info params))
+     ;; Otherwise, perform asynchronous execution
+     (t
       (let ((placeholder (ob-async--generate-uuid)))
 	(org-babel-insert-result placeholder '("replace"))
 	;; This is the original source of org-babel-execute-src-block
@@ -721,7 +795,8 @@ ripped straight from the original source for
 			  (point-to-register 13) ;; TODO: totally arbitrary choice of register
 			  (goto-char (point-min))
 			  (re-search-forward ,placeholder)
-			  (org-babel-previous-src-block)
+			  (org-backward-element)
+			  (org-backward-element)
 			  (let ((file (cdr (assq :file ',params))))
                             ;; If non-empty result and :file then write to :file.
                             (when file
@@ -746,7 +821,7 @@ ripped straight from the original source for
                             (org-babel-insert-result result ',result-params ',info ',new-hash ',lang)
                             (run-hooks 'org-babel-after-execute-hook))
                             (goto-char (point-min))
-                            (jump-to-register 13))))))))))))))
+                            (jump-to-register 13)))))))))))))))
 #+END_SRC
 
 Our UUID is just a random MD5 hash, which is 32 characters.
@@ -760,13 +835,18 @@ Our UUID is just a random MD5 hash, which is 32 characters.
 #+RESULTS:
 : generate-uuid
 
+Advise all org-babel executions for potential asynchronicity.
+
+#+BEGIN_SRC emacs-lisp
+  (advice-add 'org-babel-execute-src-block :around 'ob-async-org-babel-execute-src-block)
+#+END_SRC
+
 ** Test Harness
 
 #+BEGIN_SRC emacs-lisp :tangle test/test-helper.el
   (org-babel-do-load-languages 'org-babel-load-languages '((emacs-lisp . t) (shell . t) (python . t)))
   (setq org-confirm-babel-evaluate nil)
   (message "org-version: %s" (org-version))
-  (add-to-list 'org-ctrl-c-ctrl-c-hook 'ob-async-org-babel-execute-src-block)
 #+END_SRC
 
 * CI
@@ -783,7 +863,7 @@ we take =async= from elpa.
 
 #+BEGIN_SRC yaml :exports results
   language: generic
-  sudo: false
+  sudo: required
   git:
     submodules: false
 
