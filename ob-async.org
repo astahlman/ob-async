@@ -716,7 +716,7 @@ ripped straight from the original source for
     (cond
      ;; If this function is not called as advice, do nothing
      ((not orig-fun)
-      (warn "ob-async-org-babel-execute-src-block is longer needed in org-ctrl-c-ctrl-c-hook")
+      (warn "ob-async-org-babel-execute-src-block is no longer needed in org-ctrl-c-ctrl-c-hook")
       nil)
      ;; If there is no :async parameter, call the original function
      ((not (assoc :async (nth 2 (or info (org-babel-get-src-block-info)))))
