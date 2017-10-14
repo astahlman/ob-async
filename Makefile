@@ -12,7 +12,8 @@ install:
 	cask install
 
 install-dev:
-	cask install --dev
+	@echo "Using emacs from $(shell which emacs)"
+	EMACS=$(shell which emacs) cask install --dev
 
 test :
 	cask exec ert-runner --verbose --debug -l ob-async.el
