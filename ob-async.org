@@ -333,6 +333,7 @@ I'd also like to test this with ERT.
 
   (require 'org)
   (require 'async)
+  (require 'subr-x)
 #+END_SRC
 
 #+RESULTS:
