@@ -890,7 +890,7 @@ we take =async= from elpa.
       fi
     - emacs --version
     # Install Cask
-    - mkdir "$HOME"/bin # Cask is installed here
+    - mkdir -p "$HOME"/bin # Cask is installed here
     - wget 'https://raw.githubusercontent.com/flycheck/emacs-travis/master/emacs-travis.mk'
     - make -f emacs-travis.mk install_cask
     # Use Cask to install dependencies
