@@ -147,7 +147,7 @@ block."
 			(let ((result-block (split-string (thing-at-point 'line t))))
 			  ;; If block has name, search by name
 			  (-if-let (block-name (nth 1 result-block))
-			    (org-babel-goto-named-src-block (string-trim block-name))
+			      (org-babel-goto-named-src-block block-name)
 			    (org-backward-element)))
 			(let ((file (cdr (assq :file ',params))))
                           ;; If non-empty result and :file then write to :file.
