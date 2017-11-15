@@ -626,6 +626,30 @@ I'd also like to test this with ERT.
 #+RESULTS:
 : test-async-execute-named-block
 
+*** Execute a named block with existing named results located anywhere in buffer
+
+#+BEGIN_SRC emacs-lisp
+  (ert-deftest test-async-execute-named-block-with-results ()
+    "Test that we can asynchronously execute a named block when results are anywhere in buffer."
+    (let ((buffer-contents "Here's a shell source block:
+    ,#+RESULTS: async-block
+
+    ,#+NAME: async-block
+    ,#+BEGIN_SRC sh :async
+       sleep 1s && echo 'Sorry for the wait.'
+    ,#+END_SRC"))
+      (with-buffer-contents buffer-contents
+			  (re-search-forward "#\\+NAME")
+			  (org-ctrl-c-ctrl-c)
+			  (should (placeholder-p (results-block-contents)))
+			  (wait-for-seconds 5)
+			  (should (string= "Sorry for the wait." (results-block-contents))))))
+#+END_SRC
+
+#+RESULTS:
+: test-async-execute-named-block-with-results
+
+
 *** TODO Execute a blocks with post-processing
 *** TODO Silent output
 
@@ -796,7 +820,11 @@ ripped straight from the original source for
 			  (goto-char (point-min))
 			  (re-search-forward ,placeholder)
 			  (org-backward-element)
-			  (org-backward-element)
+			  (let ((result-block (split-string (thing-at-point 'line t))))
+			    ;; If block has name, search by name
+			    (-if-let (block-name (nth 1 result-block))
+			        (org-babel-goto-named-src-block block-name)
+			      (org-backward-element)))
 			  (let ((file (cdr (assq :file ',params))))
                             ;; If non-empty result and :file then write to :file.
                             (when file
@@ -886,7 +914,7 @@ we take =async= from elpa.
       fi
     - emacs --version
     # Install Cask
-    - mkdir "$HOME"/bin # Cask is installed here
+    - mkdir -p "$HOME"/bin # Cask is installed here
     - wget 'https://raw.githubusercontent.com/flycheck/emacs-travis/master/emacs-travis.mk'
     - make -f emacs-travis.mk install_cask
     # Use Cask to install dependencies
@@ -910,3 +938,9 @@ we take =async= from elpa.
 #+BEGIN_SRC emacs-lisp :tangle ob-async.el
   ;;; ob-async.el ends here
 #+END_SRC
+
+* COMMENT Local Variables
+# Local Variables:
+# org-src-preserve-indentation: nil
+# org-adapt-indentation: nil
+# End:
