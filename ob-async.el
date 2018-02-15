@@ -1,10 +1,10 @@
-;;; ob-async.el --- Asynchronous org-babel src block execution
+;;; ob-async.el --- Asynchronous org-babel src block execution -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2017 Andrew Stahlman
 
 ;; Author: Andrew Stahlman <andrewstahlman@gmail.com>
 ;; Created: 10 Feb 2017
-;; Version: 0.1
+;; Version: 0.2
 
 ;; Keywords: tools
 ;; Homepage: https://github.com/astahlman/ob-async
@@ -24,7 +24,7 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-;; Package-Requires: ((async "1.9") (org "9.0.1") (emacs "24.4"))
+;; Package-Requires: ((org "9.0.1") (emacs "26.0"))
 
 ;;; Commentary:
 ;; This file enables asynchronous execution of org-babel
@@ -35,7 +35,24 @@
 (provide 'ob-async)
 
 (require 'org)
-(require 'async)
+
+(defconst ob-async--totally-arbitrary-register 13
+  "TODO: Make totally arbitrary choice of register customizable.")
+
+(defun ob-async--async-start (start-func &optional finish-func)
+  "`finish-func' is executed with the return values from `start-func'."
+  (let* ((start-func-results nil)
+         (start-func-thread (make-thread (lambda () (setq start-func-results (funcall start-func)))))
+         (check-interval 3)
+         (start-func-check-func
+          (lambda (start-func-check-func)
+            (if (thread-alive-p start-func-thread)
+                (run-at-time check-interval nil start-func-check-func start-func-check-func)
+              (progn
+                (when (functionp finish-func)
+                  (thread-join start-func-thread)
+                  (funcall finish-func start-func-results)))))))
+    (run-with-timer check-interval nil start-func-check-func start-func-check-func)))
 
 ;;;###autoload
 (defalias 'org-babel-execute-src-block:async 'ob-async-org-babel-execute-src-block)
@@ -126,13 +143,8 @@ block."
 		       (let ((name (nth 4 info)))
 			 (if name (format " (%s)" name) "")))
 		(progn
-                  (async-start
+                  (ob-async--async-start
                    `(lambda ()
-		      ;; TODO: Put this in a function so it can be overidden
-		      ;; Initialize the new Emacs process with org-babel functions
-		      (setq exec-path ',exec-path)
-		      (package-initialize)
-		      (org-babel-do-load-languages 'org-babel-load-languages ',org-babel-load-languages)
 		      (let ((default-directory ,default-directory))
 			(,cmd ,body ',params)))
                    (if (member "none" ',result-params)
@@ -140,7 +152,7 @@ block."
 			      'ignore)
                      `(lambda (result)
 			(switch-to-buffer ,(current-buffer))
-			(point-to-register 13) ;; TODO: totally arbitrary choice of register
+			(point-to-register ob-async--totally-arbitrary-register)
 			(goto-char (point-min))
 			(re-search-forward ,placeholder)
 			(org-backward-element)
@@ -173,7 +185,7 @@ block."
                           (org-babel-insert-result result ',result-params ',info ',new-hash ',lang)
                           (run-hooks 'org-babel-after-execute-hook))
                           (goto-char (point-min))
-                          (jump-to-register 13)))))))))))))))
+                          (jump-to-register ob-async--totally-arbitrary-register)))))))))))))))
 
 (defun ob-async--generate-uuid ()
   "Generate a 32 character UUID."
