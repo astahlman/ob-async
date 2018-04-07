@@ -72,108 +72,109 @@ block."
    ;; Otherwise, perform asynchronous execution
    (t
     (let ((placeholder (ob-async--generate-uuid)))
-      (org-babel-insert-result placeholder '("replace"))
-      ;; This is the original source of org-babel-execute-src-block
+      ;; Here begins the original source of org-babel-execute-src-block
       (let* ((org-babel-current-src-block-location
-	    (or org-babel-current-src-block-location
-		(nth 5 info)
-		(org-babel-where-is-src-block-head)))
-	   (info (if info (copy-tree info) (org-babel-get-src-block-info))))
-      ;; Merge PARAMS with INFO before considering source block
-      ;; evaluation since both could disagree.
-      (cl-callf org-babel-merge-params (nth 2 info) params)
-      (when (org-babel-check-evaluate info)
-	(cl-callf org-babel-process-params (nth 2 info))
-	(let* ((params (nth 2 info))
-	       (cache (let ((c (cdr (assq :cache params))))
-			(and (not arg) c (string= "yes" c))))
-	       (new-hash (and cache (org-babel-sha1-hash info)))
-	       (old-hash (and cache (org-babel-current-result-hash)))
-	       (current-cache (and new-hash (equal new-hash old-hash))))
-	  (cond
-	   (current-cache
-	    (save-excursion		;Return cached result.
-	      (goto-char (org-babel-where-is-src-block-result nil info))
-	      (forward-line)
-	      (skip-chars-forward " \t")
-	      (let ((result (org-babel-read-result)))
-		(message (replace-regexp-in-string "%" "%%" (format "%S" result)))
-		result)))
-	   ((org-babel-confirm-evaluate info)
-	    (let* ((lang (nth 0 info))
-		   (result-params (cdr (assq :result-params params)))
-		   ;; Expand noweb references in BODY and remove any
-		   ;; coderef.
-		   (body
-		    (let ((coderef (nth 6 info))
-			  (expand
-			   (if (org-babel-noweb-p params :eval)
-			       (org-babel-expand-noweb-references info)
-			     (nth 1 info))))
-		      (if (not coderef) expand
-			(replace-regexp-in-string
-			 (org-src-coderef-regexp coderef) "" expand nil nil 1))))
-		   (dir (cdr (assq :dir params)))
-		   (default-directory
-		     (or (and dir (file-name-as-directory (expand-file-name dir)))
-			 default-directory))
-		   (cmd (intern (concat "org-babel-execute:" lang)))
-		   result)
-	      (unless (fboundp cmd)
-		(error "No org-babel-execute function for %s!" lang))
-	      (message "executing %s code block%s..."
-		       (capitalize lang)
-		       (let ((name (nth 4 info)))
-			 (if name (format " (%s)" name) "")))
-		(progn
+              (or org-babel-current-src-block-location
+                  (nth 5 info)
+                  (org-babel-where-is-src-block-head)))
+             (info (if info (copy-tree info) (org-babel-get-src-block-info))))
+        ;; Merge PARAMS with INFO before considering source block
+        ;; evaluation since both could disagree.
+        (cl-callf org-babel-merge-params (nth 2 info) params)
+        (when (org-babel-check-evaluate info)
+          (cl-callf org-babel-process-params (nth 2 info))
+          (let* ((params (nth 2 info))
+                 (cache (let ((c (cdr (assq :cache params))))
+                          (and (not arg) c (string= "yes" c))))
+                 (new-hash (and cache (org-babel-sha1-hash info)))
+                 (old-hash (and cache (org-babel-current-result-hash)))
+                 (current-cache (and new-hash (equal new-hash old-hash))))
+            (cond
+             (current-cache
+              (save-excursion		;Return cached result.
+                (goto-char (org-babel-where-is-src-block-result nil info))
+                (forward-line)
+                (skip-chars-forward " \t")
+                (let ((result (org-babel-read-result)))
+                  (message (replace-regexp-in-string "%" "%%" (format "%S" result)))
+                  result)))
+             ((org-babel-confirm-evaluate info)
+              ;; Insert a GUID as a placeholder in our RESULTS block
+              (org-babel-insert-result placeholder '("replace"))
+              (let* ((lang (nth 0 info))
+                     (result-params (cdr (assq :result-params params)))
+                     ;; Expand noweb references in BODY and remove any
+                     ;; coderef.
+                     (body
+                      (let ((coderef (nth 6 info))
+                            (expand
+                             (if (org-babel-noweb-p params :eval)
+                                 (org-babel-expand-noweb-references info)
+                               (nth 1 info))))
+                        (if (not coderef) expand
+                          (replace-regexp-in-string
+                           (org-src-coderef-regexp coderef) "" expand nil nil 1))))
+                     (dir (cdr (assq :dir params)))
+                     (default-directory
+                       (or (and dir (file-name-as-directory (expand-file-name dir)))
+                           default-directory))
+                     (cmd (intern (concat "org-babel-execute:" lang)))
+                     result)
+                (unless (fboundp cmd)
+                  (error "No org-babel-execute function for %s!" lang))
+                (message "executing %s code block%s..."
+                         (capitalize lang)
+                         (let ((name (nth 4 info)))
+                           (if name (format " (%s)" name) "")))
+                (progn
                   (async-start
                    `(lambda ()
-		      ;; TODO: Put this in a function so it can be overidden
-		      ;; Initialize the new Emacs process with org-babel functions
-		      (setq exec-path ',exec-path)
-		      (package-initialize)
-		      (org-babel-do-load-languages 'org-babel-load-languages ',org-babel-load-languages)
-		      (let ((default-directory ,default-directory))
-			(,cmd ,body ',params)))
+                      ;; TODO: Put this in a function so it can be overidden
+                      ;; Initialize the new Emacs process with org-babel functions
+                      (setq exec-path ',exec-path)
+                      (package-initialize)
+                      (org-babel-do-load-languages 'org-babel-load-languages ',org-babel-load-languages)
+                      (let ((default-directory ,default-directory))
+                        (,cmd ,body ',params)))
                    (if (member "none" ',result-params)
-		       (progn (message "result silenced")
-			      'ignore)
+                       (progn (message "result silenced")
+                              'ignore)
                      `(lambda (result)
-			(switch-to-buffer ,(current-buffer))
-			(point-to-register 13) ;; TODO: totally arbitrary choice of register
-			(goto-char (point-min))
-			(re-search-forward ,placeholder)
-			(org-backward-element)
-			(let ((result-block (split-string (thing-at-point 'line t))))
-			  ;; If block has name, search by name
-			  (-if-let (block-name (nth 1 result-block))
-			      (org-babel-goto-named-src-block block-name)
-			    (org-backward-element)))
-			(let ((file (cdr (assq :file ',params))))
+                        (switch-to-buffer ,(current-buffer))
+                        (point-to-register 13) ;; TODO: totally arbitrary choice of register
+                        (goto-char (point-min))
+                        (re-search-forward ,placeholder)
+                        (org-backward-element)
+                        (let ((result-block (split-string (thing-at-point 'line t))))
+                          ;; If block has name, search by name
+                          (-if-let (block-name (nth 1 result-block))
+                              (org-babel-goto-named-src-block block-name)
+                            (org-backward-element)))
+                        (let ((file (cdr (assq :file ',params))))
                           ;; If non-empty result and :file then write to :file.
                           (when file
                             (when result
-			      (with-temp-file file
-				(insert (org-babel-format-result
-					 result (cdr (assq :sep ',params))))))
+                              (with-temp-file file
+                                (insert (org-babel-format-result
+                                         result (cdr (assq :sep ',params))))))
                             (setq result file))
                           ;; Possibly perform post process provided its
                           ;; appropriate.  Dynamically bind "*this*" to the
                           ;; actual results of the block.
                           (let ((post (cdr (assq :post ',params))))
                             (when post
-			      (let ((*this* (if (not file) result
-					      (org-babel-result-to-file
-					       file
-					       (let ((desc (assq :file-desc ',params)))
-						 (and desc (or (cdr desc) result)))))))
-				(setq result (org-babel-ref-resolve post))
-				(when file
+                              (let ((*this* (if (not file) result
+                                              (org-babel-result-to-file
+                                               file
+                                               (let ((desc (assq :file-desc ',params)))
+                                                 (and desc (or (cdr desc) result)))))))
+                                (setq result (org-babel-ref-resolve post))
+                                (when file
                                   (setq result-params (remove "file" ',result-params))))))
                           (org-babel-insert-result result ',result-params ',info ',new-hash ',lang)
                           (run-hooks 'org-babel-after-execute-hook))
-                          (goto-char (point-min))
-                          (jump-to-register 13)))))))))))))))
+                        (goto-char (point-min))
+                        (jump-to-register 13)))))))))))))))
 
 (defun ob-async--generate-uuid ()
   "Generate a 32 character UUID."
