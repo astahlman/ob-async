@@ -252,3 +252,16 @@ for row in x:
 			    (should (placeholder-p (results-block-contents position)))
 			    (wait-for-seconds 5)
 			    (should (string= "Sorry for the wait." (results-block-contents position)))))))
+
+(ert-deftest test-confirm-evaluate ()
+  "Test that we do not add a RESULTS block if evaluation is not confirmed"
+  (let ((buffer-contents "
+  #+BEGIN_SRC sh :async
+     sleep 1s && echo 'Sorry for the wait.'
+  #+END_SRC")
+        (org-confirm-babel-evaluate t)
+        (org-babel-confirm-evaluate-answer-no t))
+    (with-buffer-contents buffer-contents
+                            (org-babel-next-src-block)
+                            (org-ctrl-c-ctrl-c)
+                            (should (not (org-babel-where-is-src-block-result))))))
