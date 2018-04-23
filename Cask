@@ -5,6 +5,7 @@
 
 (depends-on "org-plus-contrib")
 (depends-on "async")
+(depends-on "dash")
 
 (development
  (depends-on "f")

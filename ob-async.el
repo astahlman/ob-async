@@ -24,7 +24,7 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-;; Package-Requires: ((async "1.9") (org "9.0.1") (emacs "24.4"))
+;; Package-Requires: ((async "1.9") (org "9.0.1") (emacs "24.4") (dash "2.14.1"))
 
 ;;; Commentary:
 ;; This file enables asynchronous execution of org-babel
@@ -36,6 +36,7 @@
 
 (require 'org)
 (require 'async)
+(require 'dash)
 
 ;;;###autoload
 (defalias 'org-babel-execute-src-block:async 'ob-async-org-babel-execute-src-block)
