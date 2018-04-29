@@ -133,6 +133,7 @@ block."
                       ;; TODO: Put this in a function so it can be overidden
                       ;; Initialize the new Emacs process with org-babel functions
                       (setq exec-path ',exec-path)
+                      (setq load-path ',load-path)
                       (package-initialize)
                       (org-babel-do-load-languages 'org-babel-load-languages ',org-babel-load-languages)
                       (let ((default-directory ,default-directory))
