@@ -19,6 +19,9 @@ of this is going to work.
 (message "Yes, I can synchronously execute emacs-lisp from an org-babel src block.")
 #+END_SRC
 
+#+RESULTS:
+: Foo
+
 * Checklist
 
 Have you installed the =ctrl-c ctrl-c= hook as described in the
@@ -47,8 +50,16 @@ processes? Compare the output of this block the output of the previous block.
 (message "PID: %s\nEmacs version: %s\norg version: %s\nPath to org: %s" (emacs-pid) (emacs-version) (org-version) (symbol-file 'org-version))
 #+END_SRC
 
-If you're using a consistent version and still facing problems, turn
-on async debugging.
+The Emacs subprocess inherits the value of =org-babel-load-languages=
+from its parent. Here are the languages which are loaded in the
+subprocess. If you don't see your desired language here, it means you
+never added it to =org-babel-load-languages= (in the parent process).
+
+#+BEGIN_SRC emacs-lisp :async
+org-babel-load-languages
+#+END_SRC
+
+If you're still facing problems, turn on async debugging.
 
 #+BEGIN_SRC emacs-lisp
 (setq async-debug t)
