@@ -19,9 +19,6 @@ of this is going to work.
 (message "Yes, I can synchronously execute emacs-lisp from an org-babel src block.")
 #+END_SRC
 
-#+RESULTS:
-: Foo
-
 * Checklist
 
 Have you installed the =ctrl-c ctrl-c= hook as described in the
