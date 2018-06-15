@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/astahlman/ob-async.svg?branch=master)](https://travis-ci.org/astahlman/ob-async)
+[![MELPA Stable](https://stable.melpa.org/packages/ob-async-badge.svg)](https://stable.melpa.org/#/ob-async)
 [![MELPA](https://melpa.org/packages/ob-async-badge.svg)](https://melpa.org/#/ob-async)
 
 `ob-async` enables asynchronous execution of org-babel src blocks,
