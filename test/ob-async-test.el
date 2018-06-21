@@ -9,9 +9,9 @@ Assume the source block is at POSITION if non-nil."
   (save-excursion
     (progn
       (if position
-	  (goto-char position)
-	(goto-char 0)
-	(org-babel-next-src-block))
+          (goto-char position)
+        (goto-char 0)
+        (org-babel-next-src-block))
       (goto-char (org-babel-where-is-src-block-result))
       (let ((result (org-babel-read-result)))
         (message "RESULTS: %s" result)
@@ -22,10 +22,10 @@ Assume the source block is at POSITION if non-nil."
   `(save-excursion
      (with-temp-buffer
        (progn
-	 (goto-char 0)
-	 (insert ,s)
-	 (goto-char 0)
-	 ,@forms))))
+         (goto-char 0)
+         (insert ,s)
+         (goto-char 0)
+         ,@forms))))
 
 (defun wait-for-seconds (n)
   "Sleep for N seconds.  This is a workaround for a bug in sleep-for.
@@ -42,11 +42,11 @@ See http://stackoverflow.com/questions/14698081/elisp-sleep-for-doesnt-block-whe
       sleep 1s && echo 'Sorry for the wait.'
   #+END_SRC"))
     (with-buffer-contents buffer-contents
-			  (org-babel-next-src-block)
-			  (org-ctrl-c-ctrl-c)
-			  (should (placeholder-p (results-block-contents)))
-			  (wait-for-seconds 5)
-			  (should (string= "Sorry for the wait." (results-block-contents))))))
+                          (org-babel-next-src-block)
+                          (org-ctrl-c-ctrl-c)
+                          (should (placeholder-p (results-block-contents)))
+                          (wait-for-seconds 5)
+                          (should (string= "Sorry for the wait." (results-block-contents))))))
 
 (ert-deftest test-async-execute-existing-sh-block ()
   "Test that we can insert results for a sh block that has already been executed"
@@ -56,17 +56,17 @@ See http://stackoverflow.com/questions/14698081/elisp-sleep-for-doesnt-block-whe
      sleep 1s && echo 'Sorry for the wait.'
   #+END_SRC"))
     (with-buffer-contents buffer-contents
-			  (org-babel-next-src-block)
-			  (org-ctrl-c-ctrl-c)
-			  (should (placeholder-p (results-block-contents)))
-			  (wait-for-seconds 5)
-			  (should (string= "Sorry for the wait." (results-block-contents)))
-			  (goto-char 0)
-			  (org-babel-next-src-block)
-			  (org-ctrl-c-ctrl-c)
-			  (should (placeholder-p (results-block-contents)))
-			  (wait-for-seconds 5)
-			  (should (string= "Sorry for the wait." (results-block-contents))))))
+                          (org-babel-next-src-block)
+                          (org-ctrl-c-ctrl-c)
+                          (should (placeholder-p (results-block-contents)))
+                          (wait-for-seconds 5)
+                          (should (string= "Sorry for the wait." (results-block-contents)))
+                          (goto-char 0)
+                          (org-babel-next-src-block)
+                          (org-ctrl-c-ctrl-c)
+                          (should (placeholder-p (results-block-contents)))
+                          (wait-for-seconds 5)
+                          (should (string= "Sorry for the wait." (results-block-contents))))))
 
 (ert-deftest test-async-execute-python-block ()
   "Test that we can insert results for a sh block that hasn't been executed yet"
@@ -76,11 +76,11 @@ See http://stackoverflow.com/questions/14698081/elisp-sleep-for-doesnt-block-whe
       return 1 + 1
   #+END_SRC"))
     (with-buffer-contents buffer-contents
-			  (org-babel-next-src-block)
-			  (org-ctrl-c-ctrl-c)
-			  (should (placeholder-p (results-block-contents)))
-			  (wait-for-seconds 5)
-			  (should (= 2 (results-block-contents))))))
+                          (org-babel-next-src-block)
+                          (org-ctrl-c-ctrl-c)
+                          (should (placeholder-p (results-block-contents)))
+                          (wait-for-seconds 5)
+                          (should (= 2 (results-block-contents))))))
 
 (ert-deftest test-async-return-to-point-above-block ()
   "Test that results are inserted in the correct location
@@ -91,19 +91,19 @@ when content has been added above the source block"
       return 1 + 1
   #+END_SRC"))
     (with-buffer-contents buffer-contents
-			  (org-babel-next-src-block)
-			  (org-ctrl-c-ctrl-c)
-			  (should (placeholder-p (results-block-contents)))
-			  (re-search-backward "block:")
-			  (end-of-line)
-			  (newline-and-indent)
-			  (insert "Here's some more stuff while we're waiting")
-			  (let ((captured-point (point)))
-			    (wait-for-seconds 5)
-			    (should (= 2 (results-block-contents)))
-			    (should (= captured-point (point)))
-			    (should (re-search-backward "some more stuff"))
-			    (should (re-search-forward "BEGIN_SRC python"))))))
+                          (org-babel-next-src-block)
+                          (org-ctrl-c-ctrl-c)
+                          (should (placeholder-p (results-block-contents)))
+                          (re-search-backward "block:")
+                          (end-of-line)
+                          (newline-and-indent)
+                          (insert "Here's some more stuff while we're waiting")
+                          (let ((captured-point (point)))
+                            (wait-for-seconds 5)
+                            (should (= 2 (results-block-contents)))
+                            (should (= captured-point (point)))
+                            (should (re-search-backward "some more stuff"))
+                            (should (re-search-forward "BEGIN_SRC python"))))))
 
 (ert-deftest test-async-return-to-point-below-block ()
   "Test that results are inserted in the correct location
@@ -114,20 +114,20 @@ when content has been added below the source block"
       return 1 + 1
   #+END_SRC"))
     (with-buffer-contents buffer-contents
-			  (org-babel-next-src-block)
-			  (org-ctrl-c-ctrl-c)
-			  (should (placeholder-p (results-block-contents)))
-			  (goto-char (point-max))
-			  (newline-and-indent)
-			  (insert "Here's some more stuff while we're waiting")
-			  (let* ((captured-point (point))
-				 (expected-point (- captured-point (- (length (ob-async--generate-uuid))
-								      (length "2")))))
-			    (wait-for-seconds 5)
-			    (should (= 2 (results-block-contents)))
-			    (should (= expected-point (point)))
-			    (should (re-search-backward "some more stuff"))
-			    (should (re-search-backward "END_SRC"))))))
+                          (org-babel-next-src-block)
+                          (org-ctrl-c-ctrl-c)
+                          (should (placeholder-p (results-block-contents)))
+                          (goto-char (point-max))
+                          (newline-and-indent)
+                          (insert "Here's some more stuff while we're waiting")
+                          (let* ((captured-point (point))
+                                 (expected-point (- captured-point (- (length (ob-async--generate-uuid))
+                                                                      (length "2")))))
+                            (wait-for-seconds 5)
+                            (should (= 2 (results-block-contents)))
+                            (should (= expected-point (point)))
+                            (should (re-search-backward "some more stuff"))
+                            (should (re-search-backward "END_SRC"))))))
 
 (ert-deftest test-async-execute-file-block ()
   "Test that we can insert results when header-arg :file is present"
@@ -137,13 +137,13 @@ when content has been added below the source block"
      echo \"Don't wait on me\"
   #+END_SRC"))
     (with-buffer-contents buffer-contents
-			  (org-babel-next-src-block)
-			  (org-ctrl-c-ctrl-c)
-			  (should (placeholder-p (results-block-contents)))
-			  (wait-for-seconds 5)
-			  (should (string= "/tmp/foo" (results-block-contents)))
-			  (let ((foo-contents (progn (find-file "/tmp/foo") (buffer-substring-no-properties (point-min) (point-max)))))
-			    (should (string= "Don't wait on me\n" foo-contents))))))
+                          (org-babel-next-src-block)
+                          (org-ctrl-c-ctrl-c)
+                          (should (placeholder-p (results-block-contents)))
+                          (wait-for-seconds 5)
+                          (should (string= "/tmp/foo" (results-block-contents)))
+                          (let ((foo-contents (progn (find-file "/tmp/foo") (buffer-substring-no-properties (point-min) (point-max)))))
+                            (should (string= "Don't wait on me\n" foo-contents))))))
 
 (ert-deftest test-async-execute-table-output ()
   "Test that we can insert table output"
@@ -155,13 +155,13 @@ for row in x:
     print '{}\\n'.format(x)
 #+END_SRC"))
     (with-buffer-contents buffer-contents
-			  (org-babel-next-src-block)
-			  (org-ctrl-c-ctrl-c)
-			  (should (placeholder-p (results-block-contents)))
-			  (message "Waiting")
-			  (wait-for-seconds 8)
-			  (should (equal '(("1,1" "1,2") ("2,1" "2,2")) (results-block-contents)))
-			  (message "%s" (results-block-contents)))))
+                          (org-babel-next-src-block)
+                          (org-ctrl-c-ctrl-c)
+                          (should (placeholder-p (results-block-contents)))
+                          (message "Waiting")
+                          (wait-for-seconds 8)
+                          (should (equal '(("1,1" "1,2") ("2,1" "2,2")) (results-block-contents)))
+                          (message "%s" (results-block-contents)))))
 
 (ert-deftest test-async-execute-tramp-block ()
   "Test that we can execute a block via Tramp with a :dir header-arg"
@@ -171,11 +171,11 @@ for row in x:
      echo $SUDO_USER $PWD
   #+END_SRC" user-login-name)))
     (with-buffer-contents buffer-contents
-			  (org-babel-next-src-block)
-			  (org-ctrl-c-ctrl-c)
-			  (should (placeholder-p (results-block-contents)))
-			  (wait-for-seconds 5)
-			  (should (string= (format "%s /" user-login-name) (results-block-contents))))))
+                          (org-babel-next-src-block)
+                          (org-ctrl-c-ctrl-c)
+                          (should (placeholder-p (results-block-contents)))
+                          (wait-for-seconds 5)
+                          (should (string= (format "%s /" user-login-name) (results-block-contents))))))
 
 (ert-deftest test-async-ctrl-c-ctrl-c-hook ()
   "Test that asynchronous execution works with org-ctrl-c-ctrl-c-hook."
@@ -184,13 +184,13 @@ for row in x:
   #+BEGIN_SRC sh :async
       sleep 1s && echo 'Sorry for the wait.'
   #+END_SRC")
-	(org-ctrl-c-ctrl-c-hook '(ob-async-org-babel-execute-src-block)))
+        (org-ctrl-c-ctrl-c-hook '(ob-async-org-babel-execute-src-block)))
     (with-buffer-contents buffer-contents
-			  (org-babel-next-src-block)
-			  (org-ctrl-c-ctrl-c)
-			  (should (placeholder-p (results-block-contents)))
-			  (wait-for-seconds 5)
-			  (should (string= "Sorry for the wait." (results-block-contents))))))
+                          (org-babel-next-src-block)
+                          (org-ctrl-c-ctrl-c)
+                          (should (placeholder-p (results-block-contents)))
+                          (wait-for-seconds 5)
+                          (should (string= "Sorry for the wait." (results-block-contents))))))
 
 (ert-deftest test-async-execute-named-block ()
   "Test that we can asynchronously execute a block when cursor is on the name."
@@ -200,11 +200,11 @@ for row in x:
      sleep 1s && echo 'Sorry for the wait.'
   #+END_SRC"))
     (with-buffer-contents buffer-contents
-			  (re-search-forward "#\\+NAME")
-			  (org-ctrl-c-ctrl-c)
-			  (should (placeholder-p (results-block-contents)))
-			  (wait-for-seconds 5)
-			  (should (string= "Sorry for the wait." (results-block-contents))))))
+                          (re-search-forward "#\\+NAME")
+                          (org-ctrl-c-ctrl-c)
+                          (should (placeholder-p (results-block-contents)))
+                          (wait-for-seconds 5)
+                          (should (string= "Sorry for the wait." (results-block-contents))))))
 
 (ert-deftest test-async-execute-named-block-with-results ()
   "Test that we can asynchronously execute a named block when results are anywhere in buffer."
@@ -216,11 +216,11 @@ for row in x:
      sleep 1s && echo 'Sorry for the wait.'
   #+END_SRC"))
     (with-buffer-contents buffer-contents
-			(re-search-forward "#\\+NAME")
-			(org-ctrl-c-ctrl-c)
-			(should (placeholder-p (results-block-contents)))
-			(wait-for-seconds 5)
-			(should (string= "Sorry for the wait." (results-block-contents))))))
+                          (re-search-forward "#\\+NAME")
+                          (org-ctrl-c-ctrl-c)
+                          (should (placeholder-p (results-block-contents)))
+                          (wait-for-seconds 5)
+                          (should (string= "Sorry for the wait." (results-block-contents))))))
 
 (ert-deftest test-async-execute-silent-block ()
   "Test that we can insert results for a sh block that hasn't been executed yet"
@@ -231,11 +231,11 @@ for row in x:
   echo \"Don't wait on me\"
   #+END_SRC"))
     (with-buffer-contents buffer-contents
-			  (org-babel-next-src-block)
-			  (org-ctrl-c-ctrl-c)
-			  (should (placeholder-p (results-block-contents)))
-			  (wait-for-seconds 5)
-			  (should (not (results-block-contents))))))
+                          (org-babel-next-src-block)
+                          (org-ctrl-c-ctrl-c)
+                          (should (placeholder-p (results-block-contents)))
+                          (wait-for-seconds 5)
+                          (should (not (results-block-contents))))))
 
 (ert-deftest test-async-execute-call ()
   "Test that we can asynchronously execute a #+CALL element."
@@ -247,11 +247,11 @@ for row in x:
 
   #+CALL: async-block()"))
     (with-buffer-contents buffer-contents
-			  (let ((position (re-search-forward "#\\+CALL")))
-			    (org-ctrl-c-ctrl-c)
-			    (should (placeholder-p (results-block-contents position)))
-			    (wait-for-seconds 5)
-			    (should (string= "Sorry for the wait." (results-block-contents position)))))))
+                          (let ((position (re-search-forward "#\\+CALL")))
+                            (org-ctrl-c-ctrl-c)
+                            (should (placeholder-p (results-block-contents position)))
+                            (wait-for-seconds 5)
+                            (should (string= "Sorry for the wait." (results-block-contents position)))))))
 
 (ert-deftest test-confirm-evaluate ()
   "Test that we do not add a RESULTS block if evaluation is not confirmed"
@@ -262,6 +262,6 @@ for row in x:
         (org-confirm-babel-evaluate t)
         (org-babel-confirm-evaluate-answer-no t))
     (with-buffer-contents buffer-contents
-                            (org-babel-next-src-block)
-                            (org-ctrl-c-ctrl-c)
-                            (should (not (org-babel-where-is-src-block-result))))))
+                          (org-babel-next-src-block)
+                          (org-ctrl-c-ctrl-c)
+                          (should (not (org-babel-where-is-src-block-result))))))
