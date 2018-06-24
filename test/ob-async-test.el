@@ -48,6 +48,20 @@ See http://stackoverflow.com/questions/14698081/elisp-sleep-for-doesnt-block-whe
                           (wait-for-seconds 5)
                           (should (string= "Sorry for the wait." (results-block-contents))))))
 
+
+(ert-deftest test-async-ignore-lang-sh-block ()
+  "Testing ignoring a language."
+  (let ((buffer-contents "Here's a shell source block:
+
+  #+BEGIN_SRC sh :async
+      sleep 1s && echo 'Sorry for the wait.'
+  #+END_SRC")
+	(ob-async-no-async-languages-alist '("sh")))
+    (with-buffer-contents buffer-contents
+                          (org-babel-next-src-block)
+                          (org-ctrl-c-ctrl-c)
+                          (should (string= "Sorry for the wait." (results-block-contents))))))
+
 (ert-deftest test-async-execute-existing-sh-block ()
   "Test that we can insert results for a sh block that has already been executed"
   (let ((buffer-contents "Here's a shell source block:
