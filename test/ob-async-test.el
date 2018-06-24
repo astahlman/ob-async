@@ -50,13 +50,13 @@ See http://stackoverflow.com/questions/14698081/elisp-sleep-for-doesnt-block-whe
 
 
 (ert-deftest test-async-ignore-lang-sh-block ()
-  "Test that we can insert results for a sh block that hasn't been executed yet"
+  "Testing ignoring a language."
   (let ((buffer-contents "Here's a shell source block:
 
   #+BEGIN_SRC sh :async
       sleep 1s && echo 'Sorry for the wait.'
   #+END_SRC")
-	(org-async-no-async-languages-alist '("sh")))
+	(ob-async-no-async-languages-alist '("sh")))
     (with-buffer-contents buffer-contents
                           (org-babel-next-src-block)
                           (org-ctrl-c-ctrl-c)
