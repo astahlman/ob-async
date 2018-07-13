@@ -21,14 +21,6 @@ of this is going to work.
 
 * Checklist
 
-Have you installed the =ctrl-c ctrl-c= hook as described in the
-README? If so, you should see =ob-async-org-babel-execute-src-block=
-in this list.
-
-#+BEGIN_SRC emacs-lisp :results value
-(message "%s" org-ctrl-c-ctrl-c-hook)
-#+END_SRC
-
 From where are you loading =ob-async=?
 
 #+BEGIN_SRC emacs-lisp
