@@ -279,3 +279,17 @@ for row in x:
                           (org-babel-next-src-block)
                           (org-ctrl-c-ctrl-c)
                           (should (not (org-babel-where-is-src-block-result))))))
+
+(ert-deftest test-pre-execute-hook ()
+  "Test that we can use a hook to perform setup before async execution"
+  (let ((buffer-contents "
+  #+BEGIN_SRC emacs-lisp :async
+     (funcall this-function-is-defined-in-a-hook 1 1)
+  #+END_SRC")
+        (ob-async-pre-execute-src-block-hook '((lambda ()
+                                                 (setq this-function-is-defined-in-a-hook #'+)))))
+    (with-buffer-contents buffer-contents
+                          (org-babel-next-src-block)
+                          (org-ctrl-c-ctrl-c)
+                          (wait-for-seconds 5)
+                          (should (= 2 (results-block-contents))))))
