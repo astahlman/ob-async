@@ -39,7 +39,14 @@
 (require 'dash)
 
 (defvar ob-async-no-async-languages-alist nil
-  "async is not used for languages listed here. Enables compatability for other languages, e.g. ipython, for which async functionality may be implemented separately.")
+  "async is not used for languages listed here. Enables
+compatibility for other languages, e.g. ipython, for which async
+functionality may be implemented separately.")
+
+(defvar ob-async-pre-execute-src-block-hook nil
+  "Hook run in the async child process prior to executing a src
+block. You can use this hook to perform language-specific
+initialization which would normally execute in your init file.")
 
 ;;;###autoload
 (defalias 'org-babel-execute-src-block:async 'ob-async-org-babel-execute-src-block)
@@ -76,7 +83,7 @@ block."
    ;; If the src block language is in the list of languages async is not to be
    ;; used for, call the original function
    ((member (nth 0 (or info (org-babel-get-src-block-info)))
-	    ob-async-no-async-languages-alist)
+            ob-async-no-async-languages-alist)
     (funcall orig-fun arg info params))
    ;; Otherwise, perform asynchronous execution
    (t
@@ -143,6 +150,8 @@ block."
                       (setq exec-path ',exec-path)
                       (setq load-path ',load-path)
                       (package-initialize)
+                      (setq ob-async-pre-execute-src-block-hook ',ob-async-pre-execute-src-block-hook)
+                      (run-hooks 'ob-async-pre-execute-src-block-hook)
                       (org-babel-do-load-languages 'org-babel-load-languages ',org-babel-load-languages)
                       (let ((default-directory ,default-directory))
                         (,cmd ,body ',params)))
