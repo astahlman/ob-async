@@ -1,3 +1,5 @@
+(require 'subr-x)
+
 (defun placeholder-p (s)
   "Return non-nil if S is a placeholder for an asynchronous result."
   (and (= 32 (length s)) (string-match-p "^[a-z0-9]\\{32\\}$" s)))
@@ -19,6 +21,7 @@ Assume the source block is at POSITION if non-nil."
 
 (defmacro with-buffer-contents (s &rest forms)
   "Create a temporary buffer with contents S and execute FORMS."
+  (declare (indent 1) (debug t))
   `(save-excursion
      (with-temp-buffer
        (progn
@@ -293,3 +296,27 @@ for row in x:
                           (org-ctrl-c-ctrl-c)
                           (wait-for-seconds 5)
                           (should (= 2 (results-block-contents))))))
+
+(ert-deftest test-output-to-file-with-dir ()
+  "Test that :file paths are resolved referenced relative to :dir"
+  (let* ((output-file "ob-async--test-output-to-file-with-dir.txt")
+         (uuid (ob-async--generate-uuid))
+         (buffer-contents (format "
+#+BEGIN_SRC sh :dir /tmp :file %s :async
+  echo %s
+#+END_SRC"
+                                  output-file
+                                  uuid)))
+    (unwind-protect
+        (progn
+          (with-buffer-contents buffer-contents
+            (org-babel-next-src-block)
+            (org-ctrl-c-ctrl-c)
+            (wait-for-seconds 5))
+          (let ((retrieved-value (with-temp-buffer
+                                   (insert-file-contents (expand-file-name output-file "/tmp"))
+                                   (string-trim (buffer-string)))))
+            (should (string= uuid retrieved-value))))
+      ;; Clean up after ourselves
+      (when (file-exists-p output-file)
+        (delete-file output-file)))))
