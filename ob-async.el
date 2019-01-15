@@ -159,39 +159,40 @@ block."
                        (progn (message "result silenced")
                               'ignore)
                      `(lambda (result)
-			(with-current-buffer ,(current-buffer)
-                          (save-excursion
-                            (goto-char (point-min))
-                            (re-search-forward ,placeholder)
-                            (org-backward-element)
-                            (let ((result-block (split-string (thing-at-point 'line t))))
-                              ;; If block has name, search by name
-                              (-if-let (block-name (nth 1 result-block))
-                                  (org-babel-goto-named-src-block block-name)
-                                (org-backward-element)))
-                            (let ((file (cdr (assq :file ',params))))
-                              ;; If non-empty result and :file then write to :file.
-                              (when file
-                                (when result
-                                  (with-temp-file file
-                                    (insert (org-babel-format-result
-                                             result (cdr (assq :sep ',params))))))
-                                (setq result file))
-                              ;; Possibly perform post process provided its
-                              ;; appropriate.  Dynamically bind "*this*" to the
-                              ;; actual results of the block.
-                              (let ((post (cdr (assq :post ',params))))
-                                (when post
-                                  (let ((*this* (if (not file) result
-                                                  (org-babel-result-to-file
-                                                   file
-                                                   (let ((desc (assq :file-desc ',params)))
-                                                     (and desc (or (cdr desc) result)))))))
-                                    (setq result (org-babel-ref-resolve post))
-                                    (when file
-                                      (setq result-params (remove "file" ',result-params))))))
-                              (org-babel-insert-result result ',result-params ',info ',new-hash ',lang)
-                              (run-hooks 'org-babel-after-execute-hook))))))))))))))))))
+                        (with-current-buffer ,(current-buffer)
+                          (let ((default-directory ,default-directory))
+                            (save-excursion
+                              (goto-char (point-min))
+                              (re-search-forward ,placeholder)
+                              (org-backward-element)
+                              (let ((result-block (split-string (thing-at-point 'line t))))
+                                ;; If block has name, search by name
+                                (-if-let (block-name (nth 1 result-block))
+                                    (org-babel-goto-named-src-block block-name)
+                                  (org-backward-element)))
+                              (let ((file (cdr (assq :file ',params))))
+                                ;; If non-empty result and :file then write to :file.
+                                (when file
+                                  (when result
+                                    (with-temp-file file
+                                      (insert (org-babel-format-result
+                                               result (cdr (assq :sep ',params))))))
+                                  (setq result file))
+                                ;; Possibly perform post process provided its
+                                ;; appropriate.  Dynamically bind "*this*" to the
+                                ;; actual results of the block.
+                                (let ((post (cdr (assq :post ',params))))
+                                  (when post
+                                    (let ((*this* (if (not file) result
+                                                    (org-babel-result-to-file
+                                                     file
+                                                     (let ((desc (assq :file-desc ',params)))
+                                                       (and desc (or (cdr desc) result)))))))
+                                      (setq result (org-babel-ref-resolve post))
+                                      (when file
+                                        (setq result-params (remove "file" ',result-params))))))
+                                (org-babel-insert-result result ',result-params ',info ',new-hash ',lang)
+                                (run-hooks 'org-babel-after-execute-hook)))))))))))))))))))
 
 (defun ob-async--generate-uuid ()
   "Generate a 32 character UUID."
