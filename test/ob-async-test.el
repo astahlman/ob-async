@@ -277,10 +277,9 @@ for row in x:
         (should (< results-block-pos src-block-pos))
         (goto-char results-block-pos)
         (should (placeholder-p (results-block-contents "test")))
-;(string-trim (org-element-property :value (org-element-at-point)))
         (wait-for-seconds 5)
         (should (string= "Sorry for the wait."
-                         (string-trim (org-element-property :value (org-element-at-point)))))))))
+                         (results-block-contents "test")))))))
 
 
 (ert-deftest test-async-execute-silent-block ()
