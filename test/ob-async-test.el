@@ -169,7 +169,7 @@ when content has been added below the source block"
 #+BEGIN_SRC python :results output table :async t
 x = [['{},{}    '.format(i, j) for j in range(1, 3)] for i in range(1, 3)]
 for row in x:
-    print '{}\\n'.format(x)
+    print('{}\\n'.format(x))
 #+END_SRC"))
     (with-buffer-contents buffer-contents
                           (org-babel-next-src-block)
