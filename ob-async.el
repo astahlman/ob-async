@@ -162,14 +162,7 @@ block."
                         (with-current-buffer ,(current-buffer)
                           (let ((default-directory ,default-directory))
                             (save-excursion
-                              (goto-char (point-min))
-                              (re-search-forward ,placeholder)
-                              (org-backward-element)
-                              (let ((result-block (split-string (thing-at-point 'line t))))
-                                ;; If block has name, search by name
-                                (-if-let (block-name (nth 1 result-block))
-                                    (org-babel-goto-named-src-block block-name)
-                                  (org-backward-element)))
+                              (goto-char ,org-babel-current-src-block-location)
                               (let ((file (cdr (assq :file ',params))))
                                 ;; If non-empty result and :file then write to :file.
                                 (when file
