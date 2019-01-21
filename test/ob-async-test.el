@@ -1,4 +1,5 @@
 (require 'subr-x)
+(require 'cl-macs)
 
 (defun placeholder-p (s)
   "Return non-nil if S is a placeholder for an asynchronous result."
@@ -12,13 +13,13 @@ If NAME is non-nil, find the results block by name."
     (progn
       (if name
           (org-babel-goto-named-result name)
-        (if-let ((result-pos (org-babel-where-is-src-block-result)))
+        (-if-let ((result-pos (org-babel-where-is-src-block-result)))
             (goto-char result-pos)
-          (assert (progn
-                    (goto-char (point-min))
-                    (re-search-forward "#\\+RESULT"))
-                  nil
-                  "Couldn't find a RESULTS block")))
+          (cl-assert (progn
+                       (goto-char (point-min))
+                       (re-search-forward "#\\+RESULT"))
+                     nil
+                     "Couldn't find a RESULTS block")))
       (let ((result (org-babel-read-result)))
         (message "RESULTS: %s" result)
         result))))
