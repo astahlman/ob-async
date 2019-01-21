@@ -93,6 +93,9 @@ block."
               (or org-babel-current-src-block-location
                   (nth 5 info)
                   (org-babel-where-is-src-block-head)))
+             (src-block-marker (save-excursion
+                                 (goto-char org-babel-current-src-block-location)
+                                 (point-marker)))
              (info (if info (copy-tree info) (org-babel-get-src-block-info))))
         ;; Merge PARAMS with INFO before considering source block
         ;; evaluation since both could disagree.
@@ -162,7 +165,7 @@ block."
                         (with-current-buffer ,(current-buffer)
                           (let ((default-directory ,default-directory))
                             (save-excursion
-                              (goto-char ,org-babel-current-src-block-location)
+                              (goto-char ,src-block-marker)
                               (let ((file (cdr (assq :file ',params))))
                                 ;; If non-empty result and :file then write to :file.
                                 (when file
