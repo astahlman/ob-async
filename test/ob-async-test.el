@@ -212,7 +212,7 @@ for row in x:
 (ert-deftest test-async-execute-named-block ()
   "Test that we can asynchronously execute a block when cursor is on the name."
   (let ((buffer-contents "Here's a shell source block:
-  #+NAME: async-block
+  #+NAME: async block with spaces in the name
   #+BEGIN_SRC sh :async
      sleep 1s && echo 'Sorry for the wait.'
   #+END_SRC"))
@@ -226,9 +226,9 @@ for row in x:
 (ert-deftest test-async-execute-named-block-with-results ()
   "Test that we can asynchronously execute a named block when results are anywhere in buffer."
   (let ((buffer-contents "Here's a shell source block:
-  #+RESULTS: async-block
+  #+RESULTS: async block with spaces in the name
 
-  #+NAME: async-block
+  #+NAME: async block with spaces in the name
   #+BEGIN_SRC sh :async
      sleep 1s && echo 'Sorry for the wait.'
   #+END_SRC"))
@@ -237,7 +237,16 @@ for row in x:
                           (org-ctrl-c-ctrl-c)
                           (should (placeholder-p (results-block-contents)))
                           (wait-for-seconds 5)
-                          (should (string= "Sorry for the wait." (results-block-contents))))))
+                          (should (string= "Sorry for the wait." (results-block-contents)))
+                          (let ((results-block-pos (save-excursion
+                                                     (goto-char (point-min))
+                                                     (re-search-forward "#\\+RESULTS")
+                                                     (point-marker)))
+                                (src-block-pos (save-excursion
+                                                     (goto-char (point-min))
+                                                     (re-search-forward "#\\+BEGIN_SRC")
+                                                     (point-marker))))
+                            (should (< results-block-pos src-block-pos))))))
 
 (ert-deftest test-async-execute-silent-block ()
   "Test that we can insert results for a sh block that hasn't been executed yet"
