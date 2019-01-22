@@ -60,7 +60,9 @@ POST-FORM is executed after the src-block finishes execution"
        (while (and
                (not ,finished)
                (<= (cl-incf ,num-attempts) ,max-attempts))
-         (sleep-for ,sleep-interval-seconds)))))
+         (sleep-for ,sleep-interval-seconds))
+       (when (not ,finished)
+         (ert-fail "Timed out waiting for src-block execution to complete")))))
 
 (ert-deftest test-async-execute-fresh-sh-block ()
   "Test that we can insert results for a sh block that hasn't been executed yet"
