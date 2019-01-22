@@ -1,20 +1,25 @@
 (require 'subr-x)
+(require 'cl-macs)
 
 (defun placeholder-p (s)
   "Return non-nil if S is a placeholder for an asynchronous result."
   (and (= 32 (length s)) (string-match-p "^[a-z0-9]\\{32\\}$" s)))
 
-(defun results-block-contents (&optional position)
+(defun results-block-contents (&optional name)
   "Return the contents of the *only* results block in the buffer.
-Assume the source block is at POSITION if non-nil."
+If NAME is non-nil, find the results block by name."
   (interactive)
   (save-excursion
     (progn
-      (if position
-          (goto-char position)
-        (goto-char 0)
-        (org-babel-next-src-block))
-      (goto-char (org-babel-where-is-src-block-result))
+      (if name
+          (org-babel-goto-named-result name)
+        (-if-let ((result-pos (org-babel-where-is-src-block-result)))
+            (goto-char result-pos)
+          (cl-assert (progn
+                       (goto-char (point-min))
+                       (re-search-forward "#\\+RESULT"))
+                     nil
+                     "Couldn't find a RESULTS block")))
       (let ((result (org-babel-read-result)))
         (message "RESULTS: %s" result)
         result))))
@@ -212,7 +217,7 @@ for row in x:
 (ert-deftest test-async-execute-named-block ()
   "Test that we can asynchronously execute a block when cursor is on the name."
   (let ((buffer-contents "Here's a shell source block:
-  #+NAME: async-block
+  #+NAME: async block with spaces in the name
   #+BEGIN_SRC sh :async
      sleep 1s && echo 'Sorry for the wait.'
   #+END_SRC"))
@@ -226,9 +231,9 @@ for row in x:
 (ert-deftest test-async-execute-named-block-with-results ()
   "Test that we can asynchronously execute a named block when results are anywhere in buffer."
   (let ((buffer-contents "Here's a shell source block:
-  #+RESULTS: async-block
+  #+RESULTS: async block with spaces in the name
 
-  #+NAME: async-block
+  #+NAME: async block with spaces in the name
   #+BEGIN_SRC sh :async
      sleep 1s && echo 'Sorry for the wait.'
   #+END_SRC"))
@@ -237,7 +242,45 @@ for row in x:
                           (org-ctrl-c-ctrl-c)
                           (should (placeholder-p (results-block-contents)))
                           (wait-for-seconds 5)
-                          (should (string= "Sorry for the wait." (results-block-contents))))))
+                          (should (string= "Sorry for the wait." (results-block-contents)))
+                          (let ((results-block-pos (save-excursion
+                                                     (goto-char (point-min))
+                                                     (re-search-forward "#\\+RESULTS")
+                                                     (point-marker)))
+                                (src-block-pos (save-excursion
+                                                     (goto-char (point-min))
+                                                     (re-search-forward "#\\+BEGIN_SRC")
+                                                     (point-marker))))
+                            (should (< results-block-pos src-block-pos))))))
+
+(ert-deftest test-async-execute-named-call-block ()
+  "Test that we can asynchronously execute a named call block ."
+  (let ((buffer-contents "
+  #+NAME: test
+  #+CALL: async-block()
+
+  Here's a shell source block:
+
+  #+NAME: async-block
+  #+BEGIN_SRC sh :async
+     echo 'Sorry for the wait.'
+  #+END_SRC "))
+    (with-buffer-contents buffer-contents
+      (re-search-forward "#\\+NAME: test")
+      (org-ctrl-c-ctrl-c)
+      (let ((results-block-pos (save-excursion
+                                 (org-babel-goto-named-result "test")
+                                 (point-marker)))
+            (src-block-pos (save-excursion
+                             (org-babel-goto-named-src-block "async-block")
+                             (point-marker))))
+        (should (< results-block-pos src-block-pos))
+        (goto-char results-block-pos)
+        (should (placeholder-p (results-block-contents "test")))
+        (wait-for-seconds 5)
+        (should (string= "Sorry for the wait."
+                         (results-block-contents "test")))))))
+
 
 (ert-deftest test-async-execute-silent-block ()
   "Test that we can insert results for a sh block that hasn't been executed yet"
@@ -264,11 +307,11 @@ for row in x:
 
   #+CALL: async-block()"))
     (with-buffer-contents buffer-contents
-                          (let ((position (re-search-forward "#\\+CALL")))
-                            (org-ctrl-c-ctrl-c)
-                            (should (placeholder-p (results-block-contents position)))
-                            (wait-for-seconds 5)
-                            (should (string= "Sorry for the wait." (results-block-contents position)))))))
+                          (re-search-forward "#\\+CALL")
+                          (org-ctrl-c-ctrl-c)
+                          (should (placeholder-p (results-block-contents)))
+                          (wait-for-seconds 5)
+                          (should (string= "Sorry for the wait." (results-block-contents))))))
 
 (ert-deftest test-confirm-evaluate ()
   "Test that we do not add a RESULTS block if evaluation is not confirmed"
