@@ -167,12 +167,14 @@ block."
                             (save-excursion
                               (goto-char ,src-block-marker)
                               (let ((file (cdr (assq :file ',params))))
-                                ;; If non-empty result and :file then write to :file.
                                 (when file
-                                  (when result
-                                    (with-temp-file file
-                                      (insert (org-babel-format-result
-                                               result (cdr (assq :sep ',params))))))
+                                  ;; when result type is link, don't write result content to file
+                                  (unless (member "link" ',result-params)
+                                    ;; If non-empty result and :file then write to :file.
+                                    (when result
+                                      (with-temp-file file
+                                        (insert (org-babel-format-result
+                                                 result (cdr (assq :sep ',params)))))))
                                   (setq result file))
                                 ;; Possibly perform post process provided its
                                 ;; appropriate.  Dynamically bind "*this*" to the
