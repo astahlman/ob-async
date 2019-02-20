@@ -216,7 +216,6 @@ when content has been added below the source block"
   (let ((buffer-contents "Here's a sh source block:
 
   #+BEGIN_SRC sh :async :results link :file \"/tmp/foo\"
-     rm -f /tmp/foo
      echo \"Don't wait on me\" > /tmp/foo
   #+END_SRC"))
     (with-buffer-contents
@@ -227,7 +226,8 @@ when content has been added below the source block"
       :post (progn
               (should (string= "/tmp/foo" (results-block-contents)))
               (let ((foo-contents (progn
-                                    (find-file "/tmp/foo")
+                                    (let ((revert-without-query '(".*")))
+                                      (find-file "/tmp/foo"))
                                     (buffer-substring-no-properties
                                      (point-min) (point-max)))))
                 (should (string= "Don't wait on me\n" foo-contents))))))))
