@@ -216,6 +216,7 @@ when content has been added below the source block"
   (let ((buffer-contents "Here's a sh source block:
 
   #+BEGIN_SRC sh :async :results link :file \"/tmp/foo\"
+     rm -f /tmp/foo
      echo \"Don't wait on me\" > /tmp/foo
   #+END_SRC"))
     (with-buffer-contents
