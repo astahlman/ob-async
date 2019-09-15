@@ -5,7 +5,7 @@ git:
 
 env:
   - EMACS_VERSION=24.5
-  - EMACS_VERSION=25
+  - EMACS_VERSION=25.3
   - EMACS_VERSION=26
 
 install:
