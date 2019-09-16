@@ -18,7 +18,7 @@ If NAME is non-nil, find the results block by name."
             (goto-char result-pos)
           (cl-assert (progn
                        (goto-char (point-min))
-                       (re-search-forward "#\\+RESULT"))
+                       (re-search-forward "#\\+RESULT" nil t))
                      nil
                      "Couldn't find a RESULTS block")))
       (let ((result (org-babel-read-result)))
@@ -344,19 +344,17 @@ for row in x:
                (should (string= "Sorry for the wait."
                                 (results-block-contents "test"))))))))
 
-(ert-deftest test-async-execute-silent-block ()
-  "Test that silent blocks should have no output"
-  :expected-result :failed
-  (let ((buffer-contents "Here's a sh source block:
-
-  #+BEGIN_SRC sh :async :results silent
-  echo \"Don't wait on me\"
+(ert-deftest test-async-results-none ()
+  "Test that `:results none' blocks should have no output"
+  (let ((buffer-contents "
+  #+BEGIN_SRC sh :async :results none
+  echo 'The lost message.'
   #+END_SRC"))
     (with-buffer-contents buffer-contents
       (org-babel-next-src-block)
       (ctrl-c-ctrl-c-with-callbacks
-       :pre (should (placeholder-p (results-block-contents)))
-       :post (should (not (results-block-contents)))))))
+       :pre (should (string-equal buffer-contents (buffer-string)))
+       :post (should (string-equal buffer-contents (buffer-string)))))))
 
 (ert-deftest test-async-execute-call ()
   "Test that we can asynchronously execute a #+CALL element."

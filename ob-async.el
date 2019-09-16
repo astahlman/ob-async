@@ -107,7 +107,8 @@ block."
                           (and (not arg) c (string= "yes" c))))
                  (new-hash (and cache (org-babel-sha1-hash info)))
                  (old-hash (and cache (org-babel-current-result-hash)))
-                 (current-cache (and new-hash (equal new-hash old-hash))))
+                 (current-cache (and new-hash (equal new-hash old-hash)))
+                 (result-params (cdr (assq :result-params params))))
             (cond
              (current-cache
               (save-excursion		;Return cached result.
@@ -119,9 +120,10 @@ block."
                   result)))
              ((org-babel-confirm-evaluate info)
               ;; Insert a GUID as a placeholder in our RESULTS block
-              (org-babel-insert-result placeholder '("replace"))
+              (when (not (or (member "none" result-params)
+                             (member "silent" result-params)))
+                (org-babel-insert-result placeholder '("replace")))
               (let* ((lang (nth 0 info))
-                     (result-params (cdr (assq :result-params params)))
                      ;; Expand noweb references in BODY and remove any
                      ;; coderef.
                      (body
@@ -158,39 +160,42 @@ block."
                       (org-babel-do-load-languages 'org-babel-load-languages ',org-babel-load-languages)
                       (let ((default-directory ,default-directory))
                         (,cmd ,body ',params)))
-                   (if (member "none" ',result-params)
-                       (progn (message "result silenced")
-                              'ignore)
-                     `(lambda (result)
-                        (with-current-buffer ,(current-buffer)
-                          (let ((default-directory ,default-directory))
-                            (save-excursion
-                              (goto-char ,src-block-marker)
-                              (let ((file (cdr (assq :file ',params))))
-                                (when file
-                                  ;; when result type is link, don't write result content to file.
-                                  (unless (member "link" ',result-params)
-                                    ;; If non-empty result and :file then write to :file.
-                                    (when result
-                                      (with-temp-file file
-                                        (insert (org-babel-format-result
-                                                 result (cdr (assq :sep ',params)))))))
-                                  (setq result file))
-                                ;; Possibly perform post process provided its
-                                ;; appropriate.  Dynamically bind "*this*" to the
-                                ;; actual results of the block.
-                                (let ((post (cdr (assq :post ',params))))
-                                  (when post
-                                    (let ((*this* (if (not file) result
-                                                    (org-babel-result-to-file
-                                                     file
-                                                     (let ((desc (assq :file-desc ',params)))
-                                                       (and desc (or (cdr desc) result)))))))
-                                      (setq result (org-babel-ref-resolve post))
-                                      (when file
-                                        (setq result-params (remove "file" ',result-params))))))
-                                (org-babel-insert-result result ',result-params ',info ',new-hash ',lang)
-                                (run-hooks 'org-babel-after-execute-hook)))))))))))))))))))
+                   `(lambda (result)
+                      (with-current-buffer ,(current-buffer)
+                        (let ((default-directory ,default-directory))
+                          (save-excursion
+                            (cond
+                              ((member "none" ',result-params)
+                               (message "result silenced"))
+                              ((member "silent" ',result-params)
+                               (message (replace-regexp-in-string "%" "%%" (format "%S" result))))
+                              (t
+                               (goto-char ,src-block-marker)
+                               (let ((file (cdr (assq :file ',params))))
+                                 (when file
+                                   ;; when result type is link, don't write result content to file.
+                                   (unless (member "link" ',result-params)
+                                     ;; If non-empty result and :file then write to :file.
+                                     (when result
+                                       (with-temp-file file
+                                         (insert (org-babel-format-result
+                                                  result (cdr (assq :sep ',params)))))))
+                                   (setq result file))
+                                 ;; Possibly perform post process provided its
+                                 ;; appropriate.  Dynamically bind "*this*" to the
+                                 ;; actual results of the block.
+                                 (let ((post (cdr (assq :post ',params))))
+                                   (when post
+                                     (let ((*this* (if (not file) result
+                                                     (org-babel-result-to-file
+                                                      file
+                                                      (let ((desc (assq :file-desc ',params)))
+                                                        (and desc (or (cdr desc) result)))))))
+                                       (setq result (org-babel-ref-resolve post))
+                                       (when file
+                                         (setq result-params (remove "file" ',result-params))))))
+                                 (org-babel-insert-result result ',result-params ',info ',new-hash ',lang))))
+                            (run-hooks 'org-babel-after-execute-hook)))))))))))))))))
 
 (defun ob-async--generate-uuid ()
   "Generate a 32 character UUID."
