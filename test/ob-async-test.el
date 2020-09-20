@@ -199,7 +199,7 @@ when content has been added below the source block"
   "Test that we can insert results when header-arg :file is present"
   (let ((buffer-contents "Here's a sh source block:
 
-  #+BEGIN_SRC sh :async :file \"/tmp/foo\"
+  #+BEGIN_SRC sh :async :results output file :file \"/tmp/test-async-execute-file-block\"
      echo \"Don't wait on me\"
   #+END_SRC"))
     (with-buffer-contents buffer-contents
@@ -207,16 +207,19 @@ when content has been added below the source block"
       (ctrl-c-ctrl-c-with-callbacks
        :pre (should (placeholder-p (results-block-contents)))
        :post (progn
-               (should (string= "/tmp/foo" (results-block-contents)))
-               (let ((foo-contents (progn (find-file "/tmp/foo") (buffer-substring-no-properties (point-min) (point-max)))))
+               (should (string= "/tmp/test-async-execute-file-block" (results-block-contents)))
+               (let ((foo-contents (progn
+                                     (find-file "/tmp/test-async-execute-file-block")
+                                     (buffer-substring-no-properties
+                                      (point-min) (point-max)))))
                  (should (string= "Don't wait on me\n" foo-contents))))))))
 
 (ert-deftest test-async-execute-file-link-result-block ()
   "Test that we can insert results when header-arg :file and :results link is present."
   (let ((buffer-contents "Here's a sh source block:
 
-  #+BEGIN_SRC sh :async :results link :file \"/tmp/foo\"
-     echo \"Don't wait on me\" > /tmp/foo
+  #+BEGIN_SRC sh :async :results link :file \"/tmp/test-async-execute-file-link-result-block\"
+     echo \"Don't wait on me\" > /tmp/test-async-execute-file-link-result-block
   #+END_SRC"))
     (with-buffer-contents
      buffer-contents
@@ -224,13 +227,13 @@ when content has been added below the source block"
      (ctrl-c-ctrl-c-with-callbacks
       :pre (should (placeholder-p (results-block-contents)))
       :post (progn
-              (should (string= "/tmp/foo" (results-block-contents)))
-              (let ((foo-contents (progn
-                                    (let ((revert-without-query '(".*")))
-                                      (find-file "/tmp/foo"))
-                                    (buffer-substring-no-properties
-                                     (point-min) (point-max)))))
-                (should (string= "Don't wait on me\n" foo-contents))))))))
+              (should (string= "/tmp/test-async-execute-file-link-result-block" (results-block-contents)))
+              (let ((file-contents (progn
+                                     (let ((revert-without-query '(".*")))
+                                       (find-file "/tmp/test-async-execute-file-link-result-block"))
+                                     (buffer-substring-no-properties
+                                      (point-min) (point-max)))))
+                (should (string= "Don't wait on me\n" file-contents))))))))
 
 (ert-deftest test-async-execute-table-output ()
   "Test that we can insert table output"
