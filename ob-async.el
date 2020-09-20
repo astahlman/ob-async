@@ -154,6 +154,8 @@ block."
                       ;; Initialize the new Emacs process with org-babel functions
                       (setq exec-path ',exec-path)
                       (setq load-path ',load-path)
+                      ;; setq any variables that are prefixed with "org-babel-"
+                      ,(async-inject-variables "\\borg-babel.+")
                       (package-initialize)
                       (setq ob-async-pre-execute-src-block-hook ',ob-async-pre-execute-src-block-hook)
                       (run-hooks 'ob-async-pre-execute-src-block-hook)

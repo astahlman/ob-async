@@ -423,3 +423,20 @@ for row in x:
       ;; Clean up after ourselves
       (when (file-exists-p output-file)
         (delete-file output-file)))))
+
+(ert-deftest test-org-babel-vars-are-set-in-subprocess ()
+  "Test that any variables prefixed with \"org-babel-\" are
+inherited by the async subprocess"
+  (let* ((org-babel-some-custom-variable "I should be set!")
+         (uuid (ob-async--generate-uuid))
+         (buffer-contents "
+#+BEGIN_SRC emacs-lisp :async
+  org-babel-some-custom-variable
+#+END_SRC"))
+    (unwind-protect
+        (progn
+          (with-buffer-contents buffer-contents
+            (org-babel-next-src-block)
+            (ctrl-c-ctrl-c-with-callbacks
+             :pre (should (placeholder-p (results-block-contents)))
+             :post (should (string= "I should be set!" (results-block-contents)))))))))
