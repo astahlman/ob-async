@@ -21,6 +21,37 @@ of this is going to work.
 
 * Checklist
 
+First, let's make sure you can run a basic async process *without*
+=org-babel= and/or =ob-async= (this is adapted from the example in the
+[[https://github.com/jwiegley/emacs-async][emacs-async README]])
+
+#+BEGIN_SRC emacs-lisp :result value
+  (makunbound 'ob-async/troubleshooting-sentinel) ;; make it re-entrant
+
+  (async-start
+   ;; What to do in the child process
+   (lambda ()
+    (message "This is a test")
+    222)
+   ;; What to do (in the parent) when the child finishes
+   (lambda (result)
+     (setq ob-async/troubleshooting-sentinel result)
+     (format "Async process done, result should be 222: %s" result)))
+
+  (let ((elapsed-secs 0)
+        (deadline-secs 5))
+    (while (and
+            (not (boundp 'ob-async/troubleshooting-sentinel))
+            (< elapsed-secs deadline-secs))
+      (incf elapsed-secs)
+      (sleep-for 1)))
+
+  (if (boundp 'ob-async/troubleshooting-sentinel)
+      (message "Yes, we are able to run async functions (result was %s)"
+               ob-async/troubleshooting-sentinel)
+    (message "Failed to run a basic async function!"))
+#+END_SRC
+
 From where are you loading =ob-async=?
 
 #+BEGIN_SRC emacs-lisp
