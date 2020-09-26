@@ -235,24 +235,23 @@ when content has been added below the source block"
                                       (point-min) (point-max)))))
                 (should (string= "Don't wait on me\n" file-contents))))))))
 
-(ert-deftest test-async-execute-table-output ()
-  "Test that we can insert table output"
-  :expected-result (if (string-match "GNU Emacs 24[.]" (emacs-version))
-                       :failed  ;; org-table parsing is failing on Emacs 24.5
-                     :passed)
-  (let ((buffer-contents "Here's a source block:
+;; org-table parsing is flaky on Emacs 24.5
+(unless (string-match "GNU Emacs 24[.]" (emacs-version))
+  (ert-deftest test-async-execute-table-output ()
+    "Test that we can insert table output"
+    (let ((buffer-contents "Here's a source block:
 
 #+BEGIN_SRC python :results output table :async t
 x = [['{},{}    '.format(i, j) for j in range(1, 3)] for i in range(1, 3)]
 for row in x:
     print('{}\\n'.format(x))
 #+END_SRC"))
-    (with-buffer-contents buffer-contents
-      (org-babel-next-src-block)
-      (ctrl-c-ctrl-c-with-callbacks
-       :pre (should (placeholder-p (results-block-contents)))
-       :post (should (equal '(("1,1" "1,2") ("2,1" "2,2"))
-                            (results-block-contents)))))))
+      (with-buffer-contents buffer-contents
+                            (org-babel-next-src-block)
+                            (ctrl-c-ctrl-c-with-callbacks
+                             :pre (should (placeholder-p (results-block-contents)))
+                             :post (should (equal '(("1,1" "1,2") ("2,1" "2,2"))
+                                                  (results-block-contents))))))))
 
 (ert-deftest test-async-execute-tramp-block ()
   "Test that we can execute a block via Tramp with a :dir header-arg"
