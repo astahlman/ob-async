@@ -155,7 +155,7 @@ block."
                       (setq exec-path ',exec-path)
                       (setq load-path ',load-path)
                       ;; setq any variables that are prefixed with "org-babel-"
-                      ,(async-inject-variables "\\borg-babel.+")
+                      ,(async-inject-variables "\\borg-babel.+" nil "^org-babel-hide-result-overlays$")
                       (package-initialize)
                       (setq ob-async-pre-execute-src-block-hook ',ob-async-pre-execute-src-block-hook)
                       (run-hooks 'ob-async-pre-execute-src-block-hook)
