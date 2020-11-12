@@ -442,3 +442,20 @@ inherited by the async subprocess"
             (ctrl-c-ctrl-c-with-callbacks
              :pre (should (placeholder-p (results-block-contents)))
              :post (should (string= "I should be set!" (results-block-contents)))))))))
+
+(ert-deftest test-org-babel-hide-result-overlays-suppressed ()
+  "Test that org-babel-hide-result-overlays is not inherited by
+the async subprocess"
+  (let* ((uuid (ob-async--generate-uuid))
+         (buffer-contents "
+#+BEGIN_SRC emacs-lisp :async
+  org-babel-hide-result-overlays
+#+END_SRC"))
+    (unwind-protect
+        (progn
+          (with-buffer-contents buffer-contents
+            (setq org-babel-hide-result-overlays (list (make-overlay 1 1)))
+            (org-babel-next-src-block)
+            (ctrl-c-ctrl-c-with-callbacks
+             :pre (should (placeholder-p (results-block-contents)))
+             :post (should (string= "nil" (results-block-contents)))))))))
