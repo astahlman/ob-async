@@ -36,12 +36,12 @@ If NAME is non-nil, find the results block by name."
          (goto-char 0)
          ,@forms))))
 
-(defmacro ctrl-c-ctrl-c-with-callbacks (pre-callback pre-form post-callback post-form)
-  "Run `org-ctrl-c-ctrl-c' with the supplied :pre and :post callbacks.
+(defmacro call-babel-exec-fn-with-callbacks (fn pre-callback pre-form post-callback post-form)
+  "Run FN with the supplied :pre and :post callbacks.
 
-PRE-FORM is executed immediately after running `org-ctrl-c-ctrl-c'
+PRE-FORM is executed immediately after running FN
 POST-FORM is executed after the src-block finishes execution"
-  (declare (debug (":pre" form ":post" form)))
+  (declare (debug (form ":pre" form ":post" form)))
   (let ((finished (cl-gensym))
         (sleep-interval-seconds (cl-gensym))
         (timeout-seconds (cl-gensym))
@@ -55,7 +55,7 @@ POST-FORM is executed after the src-block finishes execution"
             (org-babel-after-execute-hook (list (lambda ()
                                                   ,post-form
                                                   (setq ,finished t)))))
-       (org-ctrl-c-ctrl-c)
+       (funcall ,fn)
        ,pre-form
        (while (and
                (not ,finished)
@@ -63,6 +63,15 @@ POST-FORM is executed after the src-block finishes execution"
          (sleep-for ,sleep-interval-seconds))
        (when (not ,finished)
          (ert-fail "Timed out waiting for src-block execution to complete")))))
+
+(defmacro ctrl-c-ctrl-c-with-callbacks (pre-callback pre-form post-callback post-form)
+  "Run `org-ctrl-c-ctrl-c' with the supplied :pre and :post callbacks.
+
+PRE-FORM is executed immediately after running `org-ctrl-c-ctrl-c'
+POST-FORM is executed after the src-block finishes execution"
+  (declare (debug (":pre" form ":post" form)))
+  (macroexpand
+   `(call-babel-exec-fn-with-callbacks #'org-ctrl-c-ctrl-c ,pre-callback ,pre-form ,post-callback ,post-form)))
 
 (ert-deftest test-async-execute-fresh-sh-block ()
   "Test that we can insert results for a sh block that hasn't been executed yet"
@@ -442,3 +451,17 @@ inherited by the async subprocess"
             (ctrl-c-ctrl-c-with-callbacks
              :pre (should (placeholder-p (results-block-contents)))
              :post (should (string= "I should be set!" (results-block-contents)))))))))
+
+(ert-deftest test-async-execute-block-without-async-with-async-param ()
+  "Test that results when header-arg :file and :results link is present."
+  (let ((buffer-contents "Here's a shell source block:
+
+  #+BEGIN_SRC sh
+     sleep 1s && echo 'Sorry for the wait.'
+  #+END_SRC"))
+    (with-buffer-contents buffer-contents
+      (org-babel-next-src-block)
+      (call-babel-exec-fn-with-callbacks
+       #'(lambda () (org-babel-execute-src-block nil nil '((:async))))
+       :pre (should (placeholder-p (results-block-contents)))
+       :post (should (string= "Sorry for the wait." (results-block-contents)))))))
