@@ -442,3 +442,24 @@ inherited by the async subprocess"
             (ctrl-c-ctrl-c-with-callbacks
              :pre (should (placeholder-p (results-block-contents)))
              :post (should (string= "I should be set!" (results-block-contents)))))))))
+
+
+(ert-deftest test-async-execute-with-ob-ref ()
+  "Test that async subprocess works properly with ob-ref"
+  (let* ((uuid (ob-async--generate-uuid))
+         (buffer-contents "
+#+NAME: result
+#+begin_example
+success
+#+end_example
+
+#+BEGIN_SRC emacs-lisp :async
+(org-babel-ref-resolve \"result\")
+#+END_SRC"))
+    (unwind-protect
+        (progn
+          (with-buffer-contents buffer-contents
+                                (org-babel-next-src-block)
+                                (ctrl-c-ctrl-c-with-callbacks
+                                 :pre (should (placeholder-p (results-block-contents)))
+                                 :post (should (string= "success" (results-block-contents)))))))))

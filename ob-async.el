@@ -140,6 +140,8 @@ block."
                        (or (and dir (file-name-as-directory (expand-file-name dir)))
                            default-directory))
                      (cmd (intern (concat "org-babel-execute:" lang)))
+                     (org-babel-async-content
+                      (buffer-substring-no-properties (point-min) (point-max)))
                      result)
                 (unless (fboundp cmd)
                   (error "No org-babel-execute function for %s!" lang))
@@ -161,7 +163,9 @@ block."
                       (run-hooks 'ob-async-pre-execute-src-block-hook)
                       (org-babel-do-load-languages 'org-babel-load-languages ',org-babel-load-languages)
                       (let ((default-directory ,default-directory))
-                        (,cmd ,body ',params)))
+                        (with-temp-buffer
+                          (insert org-babel-async-content)
+                          (,cmd ,body ',params))))
                    `(lambda (result)
                       (with-current-buffer ,(current-buffer)
                         (let ((default-directory ,default-directory))
