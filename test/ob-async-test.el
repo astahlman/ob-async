@@ -443,6 +443,23 @@ inherited by the async subprocess"
              :pre (should (placeholder-p (results-block-contents)))
              :post (should (string= "I should be set!" (results-block-contents)))))))))
 
+(ert-deftest test-inject-variables-are-set-in-subprocess ()
+  "Test that variables in the `ob-sync-inject-variables' regex are
+inherited by the async subprocess"
+  (let* ((ob-async-inject-variables "\\(\\borg-babel.+\\|some-injected-variable\\)")
+         (some-injected-variable "I should be set!")
+         (uuid (ob-async--generate-uuid))
+         (buffer-contents "
+#+BEGIN_SRC emacs-lisp :async
+  some-injected-variable
+#+END_SRC"))
+    (unwind-protect
+        (progn
+          (with-buffer-contents buffer-contents
+            (org-babel-next-src-block)
+            (ctrl-c-ctrl-c-with-callbacks
+             :pre (should (placeholder-p (results-block-contents)))
+             :post (should (string= "I should be set!" (results-block-contents)))))))))
 
 (ert-deftest test-async-execute-with-ob-ref ()
   "Test that async subprocess works properly with ob-ref"

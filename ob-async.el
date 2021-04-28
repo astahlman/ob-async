@@ -48,6 +48,11 @@ functionality may be implemented separately.")
 block. You can use this hook to perform language-specific
 initialization which would normally execute in your init file.")
 
+(defvar ob-async-inject-variables "\\borg-babel.+"
+  "Regex of variables that should be injected into the async process.
+It's a good idea to include any variables that are prefixed with `org-babel'.
+Add additional variables like \"\\(\\borg-babel.+\\|sql-connection-alist\\)\".")
+
 ;;;###autoload
 (defalias 'org-babel-execute-src-block:async 'ob-async-org-babel-execute-src-block)
 
@@ -156,8 +161,7 @@ block."
                       ;; Initialize the new Emacs process with org-babel functions
                       (setq exec-path ',exec-path)
                       (setq load-path ',load-path)
-                      ;; setq any variables that are prefixed with "org-babel-"
-                      ,(async-inject-variables "\\borg-babel.+")
+                      ,(async-inject-variables ob-async-inject-variables)
                       (package-initialize)
                       (setq ob-async-pre-execute-src-block-hook ',ob-async-pre-execute-src-block-hook)
                       (run-hooks 'ob-async-pre-execute-src-block-hook)
