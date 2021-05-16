@@ -5,9 +5,9 @@
 
 (depends-on "org-plus-contrib")
 (depends-on "async")
-(depends-on "dash")
 
 (development
+ (depends-on "dash")
  (depends-on "f")
  (depends-on "ecukes")
  (depends-on "ert-runner")
