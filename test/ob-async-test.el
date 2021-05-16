@@ -1,6 +1,7 @@
-(require 'subr-x)
-(require 'cl-macs)
 (require 'cl-lib)
+(require 'cl-macs)
+(require 'dash)
+(require 'subr-x)
 
 (defun placeholder-p (s)
   "Return non-nil if S is a placeholder for an asynchronous result."
