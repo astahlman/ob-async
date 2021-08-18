@@ -24,7 +24,7 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-;; Package-Requires: ((async "1.9") (org "9.0.1") (emacs "24.4") (dash "2.14.1"))
+;; Package-Requires: ((async "1.9") (org "9.0.1") (emacs "24.4") (dash "2.14.1") (session-async "0.0.2"))
 
 ;;; Commentary:
 ;; This file enables asynchronous execution of org-babel
@@ -33,9 +33,9 @@
 ;;; Code:
 
 (provide 'ob-async)
-
 (require 'org)
 (require 'async)
+(require 'session-async)
 (require 'dash)
 
 (defvar ob-async-no-async-languages-alist nil
@@ -52,6 +52,20 @@ initialization which would normally execute in your init file.")
   "Regex of variables that should be injected into the async process.
 It's a good idea to include any variables that are prefixed with `org-babel'.
 Add additional variables like \"\\(\\borg-babel.+\\|sql-connection-alist\\)\".")
+
+(defvar ob-async--current-session
+  nil
+  "Background session executing blocks.")
+
+(defun ob-async--get-current-session ()
+  "Ensure `ob-async--current-session' is running and return it."
+  (or (and ob-async--current-session
+           (jsonrpc-running-p ob-async--current-session)
+           ob-async--current-session)
+      (setq ob-async--current-session
+            (session-async-new
+             (format "* ob-async %s*"
+                     (ob-async--generate-uuid))))))
 
 ;;;###autoload
 (defalias 'org-babel-execute-src-block:async 'ob-async-org-babel-execute-src-block)
@@ -155,7 +169,7 @@ block."
                          (let ((name (nth 4 info)))
                            (if name (format " (%s)" name) "")))
                 (progn
-                  (async-start
+                  (session-async-start
                    `(lambda ()
                       ;; TODO: Put this in a function so it can be overidden
                       ;; Initialize the new Emacs process with org-babel functions
@@ -205,7 +219,8 @@ block."
                                        (when file
                                          (setq result-params (remove "file" ',result-params))))))
                                  (org-babel-insert-result result ',result-params ',info ',new-hash ',lang))))
-                            (run-hooks 'org-babel-after-execute-hook)))))))))))))))))
+                            (run-hooks 'org-babel-after-execute-hook)))))
+                   (ob-async--get-current-session)))))))))))))
 
 (defun ob-async--generate-uuid ()
   "Generate a 32 character UUID."
