@@ -59,13 +59,28 @@ Add additional variables like \"\\(\\borg-babel.+\\|sql-connection-alist\\)\".")
 
 (defun ob-async--get-current-session ()
   "Ensure `ob-async--current-session' is running and return it."
-  (or (and ob-async--current-session
-           (jsonrpc-running-p ob-async--current-session)
-           ob-async--current-session)
-      (setq ob-async--current-session
-            (session-async-new
-             (format "* ob-async %s*"
-                     (ob-async--generate-uuid))))))
+  ;; "unless already initialized and running"
+  (unless (and ob-async--current-session
+               (jsonrpc-running-p ob-async--current-session))
+    ;; create new session
+    (setq ob-async--current-session
+          (session-async-new
+           (format "* ob-async %s*"
+                   (ob-async--generate-uuid))))
+    ;; initialize session with packages and pre-execute hooks
+    (session-async-start
+     `(lambda ()
+        ;; Initialize the new Emacs process with org-babel functions
+        (setq exec-path ',exec-path)
+        (setq load-path ',load-path)
+        ,(async-inject-variables ob-async-inject-variables)
+        (package-initialize)
+        (setq ob-async-pre-execute-src-block-hook ',ob-async-pre-execute-src-block-hook)
+        (run-hooks 'ob-async-pre-execute-src-block-hook)
+        (org-babel-do-load-languages 'org-babel-load-languages ',org-babel-load-languages))
+     'ignore
+     ob-async--current-session))
+  ob-async--current-session)
 
 ;;;###autoload
 (defalias 'org-babel-execute-src-block:async 'ob-async-org-babel-execute-src-block)
@@ -171,15 +186,6 @@ block."
                 (progn
                   (session-async-start
                    `(lambda ()
-                      ;; TODO: Put this in a function so it can be overidden
-                      ;; Initialize the new Emacs process with org-babel functions
-                      (setq exec-path ',exec-path)
-                      (setq load-path ',load-path)
-                      ,(async-inject-variables ob-async-inject-variables)
-                      (package-initialize)
-                      (setq ob-async-pre-execute-src-block-hook ',ob-async-pre-execute-src-block-hook)
-                      (run-hooks 'ob-async-pre-execute-src-block-hook)
-                      (org-babel-do-load-languages 'org-babel-load-languages ',org-babel-load-languages)
                       (let ((default-directory ,default-directory))
                         (with-temp-buffer
                           (insert org-babel-async-content)
