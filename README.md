@@ -45,6 +45,19 @@ Example:
 For additional context, see
 https://github.com/astahlman/ob-async/pull/35.
 
+### ob-async-ignore-sessions
+
+This variable allows using `ob-async` for nonsession blocks, while
+using alternative `:async` implementations for session blocks. This
+may be useful for languages like `ob-python` and `ob-R`, which have
+built-in `:async` implementations for sessions, but don't handle
+`:async` for nonsessions.
+
+This variable can be a list, in which case it is like
+`ob-async-no-async-languages-alist` but for sessions
+only. Alternatively, it can be set to `t` to have `ob-async` always
+ignore session blocks.
+
 ### ob-async-pre-execute-src-block-hook
 
 Some org-babel languages require additional user configuration. For
