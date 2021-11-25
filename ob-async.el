@@ -43,6 +43,12 @@
 compatibility for other languages, e.g. ipython, for which async
 functionality may be implemented separately.")
 
+(defvar ob-async-ignore-sessions '("python" "R")
+  "Don't try to use async in sessions for these languages.
+Like `ob-async-no-async-languages-alist', but only for
+sessions. Can alternatively be set to `t', in which case ob-async
+ignores sessions for all languages.")
+
 (defvar ob-async-pre-execute-src-block-hook nil
   "Hook run in the async child process prior to executing a src
 block. You can use this hook to perform language-specific
@@ -84,6 +90,14 @@ block."
     nil)
    ;; If there is no :async parameter, call the original function
    ((not (assoc :async (nth 2 (or info (org-babel-get-src-block-info)))))
+    (funcall orig-fun arg info params))
+   ;; If a session, check ob-async-ignore-sessions to determine
+   ;; whether to call the original function
+   ((and (assoc :session (nth 2 (or info (org-babel-get-src-block-info))))
+         (or (equal ob-async-ignore-sessions t)
+             (and (listp ob-async-ignore-sessions)
+                  (member (nth 0 (or info (org-babel-get-src-block-info)))
+                          ob-async-ignore-sessions))))
     (funcall orig-fun arg info params))
    ;; If the src block language is in the list of languages async is not to be
    ;; used for, call the original function
