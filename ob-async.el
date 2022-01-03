@@ -188,7 +188,7 @@ block."
                    `(lambda ()
                       (let ((default-directory ,default-directory))
                         (with-temp-buffer
-                          (insert org-babel-async-content)
+                          (insert ,org-babel-async-content)
                           (,cmd ,body ',params))))
                    `(lambda (result)
                       (with-current-buffer ,(current-buffer)
