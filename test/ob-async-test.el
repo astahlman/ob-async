@@ -1,3 +1,4 @@
+(require 'dash)
 (require 'subr-x)
 (require 'cl-macs)
 (require 'cl-lib)
@@ -480,3 +481,36 @@ success
                                 (ctrl-c-ctrl-c-with-callbacks
                                  :pre (should (placeholder-p (results-block-contents)))
                                  :post (should (string= "success" (results-block-contents)))))))))
+
+(ert-deftest test-async-session ()
+  "Session is saved among :async calls."
+  ;; first block
+
+  (let ((buffer-contents   "Here's first block that will initialize session and set a var
+#+name: first_block
+#+BEGIN_SRC sh :session my-session :async :results output raw
+export GREETING=Hola
+#+END_SRC
+"))
+    (with-buffer-contents buffer-contents
+                          (org-babel-next-src-block)
+                          (ctrl-c-ctrl-c-with-callbacks
+                           ;; ensure it was executed in background session
+                           :pre (should (placeholder-p (results-block-contents)))
+                           ;; ignore result
+                           :post 'ignore)))
+  ;; second block
+  (let ((buffer-contents   "Here's the second block that will re-use previous session
+
+#+name: second_block
+#+BEGIN_SRC sh :session my-session :async :results output raw
+  echo \"$GREETING\" from second block
+#+END_SRC
+"))
+    (with-buffer-contents buffer-contents
+                          (org-babel-next-src-block)
+                          (ctrl-c-ctrl-c-with-callbacks
+                           :pre (should (placeholder-p (results-block-contents)))
+                           :post (should (string= "Hola from second block"
+                                                  (string-trim-right
+                                                   (results-block-contents))))))))
