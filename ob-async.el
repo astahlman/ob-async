@@ -169,7 +169,12 @@ block."
                       (let ((default-directory ,default-directory))
                         (with-temp-buffer
                           (insert org-babel-async-content)
-                          (,cmd ,body ',params))))
+                          (condition-case context
+                              (,cmd ,body ',params)
+                            (error (format
+                                    "Failure: during the async execution of your code block the following error was signaled:\n   %s: %s"
+                                    (car context)
+                                    (cdr context)))))))
                    `(lambda (result)
                       (with-current-buffer ,(current-buffer)
                         (let ((default-directory ,default-directory))
