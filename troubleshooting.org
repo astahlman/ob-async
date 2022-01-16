@@ -97,10 +97,12 @@ still nothing obviously wrong, file an issue on GitHub and include the
 contents of this file as a Gist.
 
 #+BEGIN_SRC emacs-lisp
-  (switch-to-buffer "*Messages*")
-  (goto-char (point-max))
-  (re-search-backward "Transmitting sexp {{{\\([^}]+\\)}}}")
-  (match-string 1)
+  (with-current-buffer "*Messages*"
+    (goto-char (point-max))
+    (re-search-backward "^Transmitting sexp {{{")
+    (let ((beg (point)))
+      (forward-sexp 3)
+      (buffer-substring beg (point))))
 #+END_SRC
 
 * Bug Description
