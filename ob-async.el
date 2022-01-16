@@ -166,10 +166,26 @@ block."
                       (setq ob-async-pre-execute-src-block-hook ',ob-async-pre-execute-src-block-hook)
                       (run-hooks 'ob-async-pre-execute-src-block-hook)
                       (org-babel-do-load-languages 'org-babel-load-languages ',org-babel-load-languages)
-                      (let ((default-directory ,default-directory))
-                        (with-temp-buffer
-                          (insert org-babel-async-content)
-                          (,cmd ,body ',params))))
+                      (advice-add 'org-babel-eval-error-notify
+                                  :override
+                                  (lambda (exit-code stderr)
+                                    (setq ob-async-eval-error `(,exit-code . ,stderr))))
+                      (defvar ob-async-eval-error nil)
+                      (let ((default-directory ,default-directory)
+                            (retval (with-temp-buffer
+                                      (insert org-babel-async-content)
+                                      (condition-case context
+                                          (,cmd ,body ',params)
+                                        (error (format
+                                                "Failure: during the async execution of your code block the following error was signaled:\n   %s: %s"
+                                                (car context)
+                                                (cdr context)))))))
+                        (if ob-async-eval-error
+                            (format
+                             "Failure: the async execution of your code block returned with exit code %s!\nThe following output was captured on stderr:\n%s"
+                             (car ob-async-eval-error)
+                             (cdr ob-async-eval-error))
+                          retval)))
                    `(lambda (result)
                       (with-current-buffer ,(current-buffer)
                         (let ((default-directory ,default-directory))
