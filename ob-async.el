@@ -168,7 +168,7 @@ block."
                       (org-babel-do-load-languages 'org-babel-load-languages ',org-babel-load-languages)
                       (let ((default-directory ,default-directory))
                         (with-temp-buffer
-                          (insert org-babel-async-content)
+                          (insert ,org-babel-async-content)
                           (,cmd ,body ',params))))
                    `(lambda (result)
                       (with-current-buffer ,(current-buffer)
