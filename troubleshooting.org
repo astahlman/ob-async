@@ -43,7 +43,7 @@ First, let's make sure you can run a basic async process *without*
     (while (and
             (not (boundp 'ob-async/troubleshooting-sentinel))
             (< elapsed-secs deadline-secs))
-      (incf elapsed-secs)
+      (cl-incf elapsed-secs)
       (sleep-for 1)))
 
   (if (boundp 'ob-async/troubleshooting-sentinel)
