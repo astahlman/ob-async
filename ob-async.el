@@ -48,10 +48,21 @@ functionality may be implemented separately.")
 block. You can use this hook to perform language-specific
 initialization which would normally execute in your init file.")
 
-(defvar ob-async-inject-variables "\\borg-babel.+"
+(defvar ob-async-inject-variables-inclusion-pattern "\\borg-babel.+"
   "Regex of variables that should be injected into the async process.
 It's a good idea to include any variables that are prefixed with `org-babel'.
 Add additional variables like \"\\(\\borg-babel.+\\|sql-connection-alist\\)\".")
+
+(defvaralias 'ob-async-inject-variables 'ob-async-inject-variables-inclusion-pattern)
+
+(defvar ob-async-inject-variables-exclusion-pattern "-overlay"
+  "Regex of variables to exclude injecting into the async process.
+It's a good idea to exclude variables that contain propertized text.
+
+Variables with values containing overlays may contain ‘-overlay’ in the name and
+are an example of variables to add to the exclusion pattern. Listing of
+additional variables can be conducted as is done with
+‘ob-async-inject-variable-inclusion-pattern’.")
 
 ;;;###autoload
 (defalias 'org-babel-execute-src-block:async 'ob-async-org-babel-execute-src-block)
@@ -161,7 +172,9 @@ block."
                       ;; Initialize the new Emacs process with org-babel functions
                       (setq exec-path ',exec-path)
                       (setq load-path ',load-path)
-                      ,(async-inject-variables ob-async-inject-variables)
+                      ,(async-inject-variables
+                        ob-async-inject-variables-inclusion-pattern nil
+                        ob-async-inject-variables-exclusion-pattern)
                       (package-initialize)
                       (setq ob-async-pre-execute-src-block-hook ',ob-async-pre-execute-src-block-hook)
                       (run-hooks 'ob-async-pre-execute-src-block-hook)
