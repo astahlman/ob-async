@@ -91,6 +91,18 @@ POST-FORM is executed after the src-block finishes execution"
       (org-ctrl-c-ctrl-c)
       (should (string= "Sorry for the wait." (results-block-contents))))))
 
+(ert-deftest test-async-no ()
+  "Testing ignoring async when `:async no' is set."
+  (let ((buffer-contents "Here's a shell source block:
+
+  #+BEGIN_SRC sh :async no
+      sleep 1s && echo 'Sorry for the wait.'
+  #+END_SRC"))
+    (with-buffer-contents buffer-contents
+      (org-babel-next-src-block)
+      (org-ctrl-c-ctrl-c)
+      (should (string= "Sorry for the wait." (results-block-contents))))))
+
 (ert-deftest test-async-execute-existing-sh-block ()
   "Test that we can insert results for a sh block that has already been executed"
   (let ((buffer-contents "Here's a shell source block:
