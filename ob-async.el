@@ -82,8 +82,9 @@ block."
    ((not orig-fun)
     (warn "ob-async-org-babel-execute-src-block is no longer needed in org-ctrl-c-ctrl-c-hook")
     nil)
-   ;; If there is no :async parameter, call the original function
-   ((not (assoc :async (nth 2 (or info (org-babel-get-src-block-info)))))
+   ;; If there is no `:async' parameter or we have `:async no', call the original function
+   ((let ((async-maybe (assoc :async (nth 2 (or info (org-babel-get-src-block-info))))))
+      (or (not async-maybe) (string-equal (cdr async-maybe) "no")))
     (funcall orig-fun arg info params))
    ;; If the src block language is in the list of languages async is not to be
    ;; used for, call the original function
