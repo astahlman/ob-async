@@ -53,6 +53,18 @@ initialization which would normally execute in your init file.")
 It's a good idea to include any variables that are prefixed with `org-babel'.
 Add additional variables like \"\\(\\borg-babel.+\\|sql-connection-alist\\)\".")
 
+(defun ob-async-dont-intercept-p (info)
+  "Returns true if this particular iteration shouldn't be sent"
+  (cond
+   ;; If there is no :async parameter, call the original function
+   ((not (assoc :async (nth 2 info))) t)
+   ;; If the src block language is in the list of languages async is not to be
+   ;; used for, call the original function
+   ((member
+     (nth 0 info)
+     ob-async-no-async-languages-alist) t)
+   (t nil)))
+
 ;;;###autoload
 (defalias 'org-babel-execute-src-block:async 'ob-async-org-babel-execute-src-block)
 
@@ -83,15 +95,9 @@ block."
    ((not orig-fun)
     (warn "ob-async-org-babel-execute-src-block is no longer needed in org-ctrl-c-ctrl-c-hook")
     nil)
-   ;; If there is no :async parameter, call the original function
-   ((not (assoc :async (nth 2 (or info (org-babel-get-src-block-info)))))
+   ;; If this function shouldn't be intercepted call it as originally intended
+   ((ob-async-dont-intercept-p (or info (org-babel-get-src-block-info)))
     (apply orig-fun arg info params other-args))
-   ;; If the src block language is in the list of languages async is not to be
-   ;; used for, call the original function
-   ((member (nth 0 (or info (org-babel-get-src-block-info)))
-            ob-async-no-async-languages-alist)
-    (apply orig-fun arg info params other-args))
-   ;; Otherwise, perform asynchronous execution
    (t
     (let ((placeholder (ob-async--generate-uuid)))
       ;; Here begins the original source of org-babel-execute-src-block
