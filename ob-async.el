@@ -58,6 +58,9 @@ Add additional variables like \"\\(\\borg-babel.+\\|sql-connection-alist\\)\".")
   (cond
    ;; If there is no :async parameter, call the original function
    ((not (assoc :async (nth 2 info))) t)
+   ;; If there is a :session parameter we are probably using the
+   ;; internal async support
+   ((assoc :session (nth 2 info)) t)
    ;; If the src block language is in the list of languages async is not to be
    ;; used for, call the original function
    ((member
